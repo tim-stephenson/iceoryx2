@@ -10,6 +10,7 @@
 //
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
+use crate::public::Public;
 use iceoryx2::service::marker::CustomKeyMarker;
 use iceoryx2_log::fatal_panic;
 use pyo3::prelude::*;
@@ -67,8 +68,12 @@ impl Writer {
     /// Creates an `EntryHandleMut` for direct write access to the value. There can be only one
     /// `EntryHandleMut` per value. On failure it returns `EntryHandleMutError` describing the
     /// failure.
-    pub fn __entry(&self, key: usize, value_type_details: TypeDetail) -> PyResult<EntryHandleMut> {
-        match &*self.value.lock() {
+    pub fn __entry(
+        &self,
+        key: usize,
+        value_type_details: TypeDetail,
+    ) -> PyResult<Public<EntryHandleMut>> {
+        (match &*self.value.lock() {
             WriterType::Ipc(Some(v)) => {
                 let entry_handle = unsafe {
                     v.__internal_entry(key as *const u8, &value_type_details.0)
@@ -93,7 +98,8 @@ impl Writer {
             }
             _ => fatal_panic!(from "Writer::entry()",
                     "Accessing a deleted writer."),
-        }
+        })
+        .map(Public)
     }
 
     /// Releases the `Writer`.

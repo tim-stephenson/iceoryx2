@@ -10,6 +10,7 @@
 //
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
+use crate::public::Public;
 use iceoryx2::service::marker::{CustomHeaderMarker, CustomPayloadMarker};
 use iceoryx2_log::fatal_panic;
 use pyo3::prelude::*;
@@ -104,8 +105,8 @@ impl Subscriber {
 
     /// Receives a `Sample` from `Publisher`. If no sample could be received `None` is returned.
     /// If a failure occurs `ReceiveError` is returned.
-    pub fn receive(&self) -> PyResult<Option<Sample>> {
-        match &*self.value.lock() {
+    pub fn receive(&self) -> PyResult<Option<Public<Sample>>> {
+        (match &*self.value.lock() {
             SubscriberType::Ipc(Some(v)) => Ok(v
                 .receive()
                 .map_err(|e| ReceiveError::new_err(format!("{e:?}")))?
@@ -124,7 +125,8 @@ impl Subscriber {
                 })),
             _ => fatal_panic!(from "Subscriber::receive()",
                     "Accessing a released Subscriber."),
-        }
+        })
+        .map(|v| v.map(Public))
     }
 
     /// Releases the `Subscriber`.

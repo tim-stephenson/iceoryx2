@@ -10,6 +10,7 @@
 //
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
+use crate::public::Public;
 use std::alloc::Layout;
 use std::ptr::copy_nonoverlapping;
 
@@ -95,8 +96,8 @@ impl ServiceBuilderBlackboardCreator {
 
     /// Defines the key type. To be able to connect to a `Service`, the `TypeDetail` must be
     /// identical in all participants since the communication is always strongly typed.
-    pub fn __set_key_type_details(&mut self, value: &TypeDetail) -> Self {
-        match &mut *self.value.lock() {
+    pub fn __set_key_type_details(&mut self, value: &TypeDetail) -> Public<Self> {
+        Public(match &mut *self.value.lock() {
             ServiceBuilderBlackboardCreatorType::Ipc(v) => {
                 let this = v.take().unwrap();
                 let this = unsafe { this.__internal_set_key_type_details(&value.0) };
@@ -107,13 +108,13 @@ impl ServiceBuilderBlackboardCreator {
                 let this = unsafe { this.__internal_set_key_type_details(&value.0) };
                 self.clone_local(this)
             }
-        }
+        })
     }
 
     /// Defines the key eq comparison function needed to store and retrieve keys in the
     /// blackboard.
-    pub fn __set_key_eq_cmp_func(&mut self, key_eq_func: Py<PyAny>) -> Self {
-        match &mut *self.value.lock() {
+    pub fn __set_key_eq_cmp_func(&mut self, key_eq_func: Py<PyAny>) -> Public<Self> {
+        Public(match &mut *self.value.lock() {
             ServiceBuilderBlackboardCreatorType::Ipc(v) => {
                 let this = v.take().unwrap();
                 let eq_func = Box::new(move |lhs: *const u8, rhs: *const u8| -> bool {
@@ -148,12 +149,12 @@ impl ServiceBuilderBlackboardCreator {
                 };
                 self.clone_local(this)
             }
-        }
+        })
     }
 
     /// Defines how many `Reader` ports shall be supported at most.
-    pub fn max_readers(&mut self, value: usize) -> Self {
-        match &mut *self.value.lock() {
+    pub fn max_readers(&mut self, value: usize) -> Public<Self> {
+        Public(match &mut *self.value.lock() {
             ServiceBuilderBlackboardCreatorType::Ipc(v) => {
                 let this = v.take().unwrap();
                 let this = this.max_readers(value);
@@ -164,12 +165,12 @@ impl ServiceBuilderBlackboardCreator {
                 let this = this.max_readers(value);
                 self.clone_local(this)
             }
-        }
+        })
     }
 
     /// Defines how many `Node` instances shall be able to open the `Service` in parallel.
-    pub fn max_nodes(&mut self, value: usize) -> Self {
-        match &mut *self.value.lock() {
+    pub fn max_nodes(&mut self, value: usize) -> Public<Self> {
+        Public(match &mut *self.value.lock() {
             ServiceBuilderBlackboardCreatorType::Ipc(v) => {
                 let this = v.take().unwrap();
                 let this = this.max_nodes(value);
@@ -180,11 +181,11 @@ impl ServiceBuilderBlackboardCreator {
                 let this = this.max_nodes(value);
                 self.clone_local(this)
             }
-        }
+        })
     }
 
     /// Adds key-value pairs to the blackboard.
-    pub fn __add(&mut self, key: usize, value: usize, value_details: &TypeDetail) -> Self {
+    pub fn __add(&mut self, key: usize, value: usize, value_details: &TypeDetail) -> Public<Self> {
         let value_layout = unsafe {
             Layout::from_size_align_unchecked(value_details.0.size(), value_details.0.alignment())
         };
@@ -194,7 +195,7 @@ impl ServiceBuilderBlackboardCreator {
         }
 
         unsafe { copy_nonoverlapping(value as *const u8, value_buffer, value_details.0.size()) };
-        match &mut *self.value.lock() {
+        Public(match &mut *self.value.lock() {
             ServiceBuilderBlackboardCreatorType::Ipc(v) => {
                 let this = v.take().unwrap();
                 let this = unsafe {
@@ -223,12 +224,12 @@ impl ServiceBuilderBlackboardCreator {
                 };
                 self.clone_local(this)
             }
-        }
+        })
     }
 
     /// Creates a new `Service`.
-    pub fn create(&mut self) -> PyResult<PortFactoryBlackboard> {
-        match &mut *self.value.lock() {
+    pub fn create(&mut self) -> PyResult<Public<PortFactoryBlackboard>> {
+        (match &mut *self.value.lock() {
             ServiceBuilderBlackboardCreatorType::Ipc(v) => {
                 let this = v.take().unwrap();
                 Ok(PortFactoryBlackboard::new(
@@ -249,15 +250,16 @@ impl ServiceBuilderBlackboardCreator {
                     self.key_type_storage.clone(),
                 ))
             }
-        }
+        })
+        .map(Public)
     }
 
     /// Creates a new `Service` with a set of attributes.
     pub fn create_with_attributes(
         &mut self,
         attributes: &AttributeSpecifier,
-    ) -> PyResult<PortFactoryBlackboard> {
-        match &mut *self.value.lock() {
+    ) -> PyResult<Public<PortFactoryBlackboard>> {
+        (match &mut *self.value.lock() {
             ServiceBuilderBlackboardCreatorType::Ipc(v) => {
                 let this = v.take().unwrap();
                 Ok(PortFactoryBlackboard::new(
@@ -278,7 +280,8 @@ impl ServiceBuilderBlackboardCreator {
                     self.key_type_storage.clone(),
                 ))
             }
-        }
+        })
+        .map(Public)
     }
 }
 
@@ -414,8 +417,8 @@ impl ServiceBuilderBlackboardOpener {
     }
 
     /// Opens an existing `Service`.
-    pub fn open(&mut self) -> PyResult<PortFactoryBlackboard> {
-        match &mut *self.value.lock() {
+    pub fn open(&mut self) -> PyResult<Public<PortFactoryBlackboard>> {
+        (match &mut *self.value.lock() {
             ServiceBuilderBlackboardOpenerType::Ipc(v) => {
                 let this = v.take().unwrap();
                 Ok(PortFactoryBlackboard::new(
@@ -436,7 +439,8 @@ impl ServiceBuilderBlackboardOpener {
                     self.key_type_details.clone(),
                 ))
             }
-        }
+        })
+        .map(Public)
     }
 
     /// Opens an existing `Service` with attribute requirements. If the defined attribute
@@ -444,8 +448,8 @@ impl ServiceBuilderBlackboardOpener {
     pub fn open_with_attributes(
         &mut self,
         verifier: &AttributeVerifier,
-    ) -> PyResult<PortFactoryBlackboard> {
-        match &mut *self.value.lock() {
+    ) -> PyResult<Public<PortFactoryBlackboard>> {
+        (match &mut *self.value.lock() {
             ServiceBuilderBlackboardOpenerType::Ipc(v) => {
                 let this = v.take().unwrap();
                 Ok(PortFactoryBlackboard::new(
@@ -466,6 +470,7 @@ impl ServiceBuilderBlackboardOpener {
                     self.key_type_details.clone(),
                 ))
             }
-        }
+        })
+        .map(Public)
     }
 }

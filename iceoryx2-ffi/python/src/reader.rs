@@ -10,6 +10,7 @@
 //
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
+use crate::public::Public;
 use iceoryx2::service::marker::CustomKeyMarker;
 use iceoryx2_log::fatal_panic;
 use pyo3::prelude::*;
@@ -65,8 +66,12 @@ impl Reader {
 
     /// Creates an EntryHandle for direct read access to the value. On failure
     /// it returns `EntryHandleError` describing the failure.
-    pub fn __entry(&self, key: usize, value_type_details: TypeDetail) -> PyResult<EntryHandle> {
-        match &*self.value.lock() {
+    pub fn __entry(
+        &self,
+        key: usize,
+        value_type_details: TypeDetail,
+    ) -> PyResult<Public<EntryHandle>> {
+        (match &*self.value.lock() {
             ReaderType::Ipc(Some(v)) => {
                 let entry_handle = unsafe {
                     v.__internal_entry(key as *const u8, &value_type_details.0)
@@ -99,7 +104,8 @@ impl Reader {
             }
             _ => fatal_panic!(from "Reader::entry()",
                     "Accessing a deleted reader."),
-        }
+        })
+        .map(Public)
     }
 
     /// Releases the `Reader`.

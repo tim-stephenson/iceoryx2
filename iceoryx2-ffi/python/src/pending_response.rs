@@ -10,6 +10,7 @@
 //
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
+use crate::public::Public;
 use iceoryx2::service::marker::{CustomHeaderMarker, CustomPayloadMarker};
 use iceoryx2_log::fatal_panic;
 use pyo3::prelude::*;
@@ -170,8 +171,8 @@ impl PendingResponse {
     }
 
     /// Receives a `Response` from a `Server` that received the `RequestMut`.
-    pub fn receive(&self) -> PyResult<Option<Response>> {
-        match &*self.value.lock() {
+    pub fn receive(&self) -> PyResult<Option<Public<Response>>> {
+        (match &*self.value.lock() {
             PendingResponseType::Ipc(Some(v)) => Ok(unsafe {
                 v.receive_custom_payload()
                     .map_err(|e| ReceiveError::new_err(format!("{e:?}")))?
@@ -192,7 +193,8 @@ impl PendingResponse {
             }),
             _ => fatal_panic!(from "PendingResponse::receive()",
                     "Accessing a released pending response."),
-        }
+        })
+        .map(|v| v.map(Public))
     }
 
     /// Marks the connection state that the `Client` wants to gracefully

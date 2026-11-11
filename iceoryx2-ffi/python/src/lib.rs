@@ -64,6 +64,7 @@ pub mod port_factory_server;
 pub mod port_factory_subscriber;
 pub mod port_factory_writer;
 pub mod port_name;
+pub mod public;
 pub mod publisher;
 pub mod reader;
 pub mod request_header;

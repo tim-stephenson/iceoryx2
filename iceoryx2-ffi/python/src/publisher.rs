@@ -10,6 +10,7 @@
 //
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
+use crate::public::Public;
 use iceoryx2::{
     port::update_connections::UpdateConnections,
     service::marker::{CustomHeaderMarker, CustomPayloadMarker},
@@ -112,7 +113,7 @@ impl Publisher {
     /// The user has to initialize the payload before it can be sent.
     ///
     /// On failure it returns `LoanError` describing the failure.
-    pub fn __loan_uninit(&self) -> PyResult<SampleMutUninit> {
+    pub fn __loan_uninit(&self) -> PyResult<Public<SampleMutUninit>> {
         self.__loan_slice_uninit(1)
     }
 
@@ -121,8 +122,11 @@ impl Publisher {
     /// Fails when it is called for data types which are not a slice.
     ///
     /// On failure it returns `LoanError` describing the failure.
-    pub fn __loan_slice_uninit(&self, number_of_elements: usize) -> PyResult<SampleMutUninit> {
-        match &*self.value.lock() {
+    pub fn __loan_slice_uninit(
+        &self,
+        number_of_elements: usize,
+    ) -> PyResult<Public<SampleMutUninit>> {
+        (match &*self.value.lock() {
             PublisherType::Ipc(Some(v)) => {
                 let sample = unsafe {
                     v.loan_custom_payload(number_of_elements)
@@ -147,7 +151,8 @@ impl Publisher {
             }
             _ => fatal_panic!(from "Publisher::loan_slice_uninit()",
                 "Accessing a deleted publisher."),
-        }
+        })
+        .map(Public)
     }
 
     /// Explicitly updates the connection to every `Subscriber`. This is

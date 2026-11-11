@@ -10,6 +10,7 @@
 //
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
+use crate::public::Public;
 use iceoryx2_log::fatal_panic;
 use pyo3::prelude::*;
 
@@ -76,8 +77,8 @@ impl EntryHandleMut {
 
     /// Consumes the `EntryHandleMut` and loans an uninitialized entry value that can be used to
     /// update without copy.
-    pub fn loan_uninit(&mut self) -> EntryValueUninit {
-        match &mut *self.value.lock() {
+    pub fn loan_uninit(&mut self) -> Public<EntryValueUninit> {
+        Public(match &mut *self.value.lock() {
             EntryHandleMutType::Ipc(v) => {
                 let entry_handle_mut = v.take().unwrap();
                 let entry_value_uninit = entry_handle_mut.loan_uninit(
@@ -102,7 +103,7 @@ impl EntryHandleMut {
                     value_type_storage: self.value_type_storage.clone(),
                 }
             }
-        }
+        })
     }
 
     /// Returns an ID corresponding to the entry which can be used in an event based

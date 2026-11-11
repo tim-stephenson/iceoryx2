@@ -10,6 +10,7 @@
 //
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
+use crate::public::Public;
 use iceoryx2::service::marker::{CustomHeaderMarker, CustomPayloadMarker};
 use pyo3::prelude::*;
 
@@ -149,9 +150,9 @@ impl PortFactoryServer {
     /// If the user reduces the preallocated `ResponseMut` count, iceoryx2 can
     /// no longer guarantee, that the `Server` can always loan a `ResponseMut`
     /// to send.
-    pub fn override_response_preallocation(&self, value: usize) -> Self {
+    pub fn override_response_preallocation(&self, value: usize) -> Public<Self> {
         let _guard = self.factory.lock();
-        match &self.value {
+        Public(match &self.value {
             PortFactoryServerType::Ipc(v) => {
                 let this = unsafe { (*v.lock()).__internal_partial_clone() };
                 *self.override_response_preallocation.lock() = Some(value);
@@ -162,14 +163,14 @@ impl PortFactoryServer {
                 *self.override_response_preallocation.lock() = Some(value);
                 self.clone_local(this)
             }
-        }
+        })
     }
 
     /// Sets the `BackpressureStrategy` which defines how the `Server` shall behave
     /// when a `Client` cannot receive a `Response` since its internal buffer is full.
-    pub fn backpressure_strategy(&self, value: &BackpressureStrategy) -> Self {
+    pub fn backpressure_strategy(&self, value: &BackpressureStrategy) -> Public<Self> {
         let _guard = self.factory.lock();
-        match &self.value {
+        Public(match &self.value {
             PortFactoryServerType::Ipc(v) => {
                 let this = unsafe { (*v.lock()).__internal_partial_clone() };
                 let this = this.backpressure_strategy(value.clone().into());
@@ -180,15 +181,15 @@ impl PortFactoryServer {
                 let this = this.backpressure_strategy(value.clone().into());
                 self.clone_local(this)
             }
-        }
+        })
     }
 
     /// Defines the maximum number of `ResponseMut` that
     /// the `Server` can loan in parallel per
     /// `ActiveRequest`.
-    pub fn max_loaned_responses_per_request(&self, value: usize) -> Self {
+    pub fn max_loaned_responses_per_request(&self, value: usize) -> Public<Self> {
         let _guard = self.factory.lock();
-        match &self.value {
+        Public(match &self.value {
             PortFactoryServerType::Ipc(v) => {
                 let this = unsafe { (*v.lock()).__internal_partial_clone() };
                 let this = this.max_loaned_responses_per_request(value);
@@ -199,15 +200,15 @@ impl PortFactoryServer {
                 let this = this.max_loaned_responses_per_request(value);
                 self.clone_local(this)
             }
-        }
+        })
     }
 
     /// The `PortName` that shall be assigned to the `Server`. It does not
     /// have to be unique. If no `PortName` is defined then the `Server`
     /// does not have a name.
-    pub fn name(&mut self, value: &PortName) -> Self {
+    pub fn name(&mut self, value: &PortName) -> Public<Self> {
         let _guard = self.factory.lock();
-        match &self.value {
+        Public(match &self.value {
             PortFactoryServerType::Ipc(v) => {
                 let this = unsafe { (*v.lock()).__internal_partial_clone() };
                 let this = this.name(&value.0);
@@ -218,14 +219,14 @@ impl PortFactoryServer {
                 let this = this.name(&value.0);
                 self.clone_local(this)
             }
-        }
+        })
     }
 
     /// Sets the maximum slice length that a user can allocate with
     /// `ActiveRequest.loan_slice` or `ActiveRequest.loan_slice_uninit`.
-    pub fn __initial_max_slice_len(&self, value: usize) -> Self {
+    pub fn __initial_max_slice_len(&self, value: usize) -> Public<Self> {
         let _guard = self.factory.lock();
-        match &self.value {
+        Public(match &self.value {
             PortFactoryServerType::Ipc(v) => {
                 let this = unsafe { (*v.lock()).__internal_partial_clone() };
                 let this = this.initial_max_slice_len(value);
@@ -236,16 +237,16 @@ impl PortFactoryServer {
                 let this = this.initial_max_slice_len(value);
                 self.clone_local(this)
             }
-        }
+        })
     }
 
     /// Defines the allocation strategy that is used when the provided
     /// `PortFactoryServer.initial_max_slice_len` is exhausted. This happens when the user
     /// acquires more than max slice len in `ActiveRequest.loan_slice` or
     /// `ActiveRequest.loan_slice_uninit`.
-    pub fn __allocation_strategy(&self, value: &AllocationStrategy) -> Self {
+    pub fn __allocation_strategy(&self, value: &AllocationStrategy) -> Public<Self> {
         let _guard = self.factory.lock();
-        match &self.value {
+        Public(match &self.value {
             PortFactoryServerType::Ipc(v) => {
                 let this = unsafe { (*v.lock()).__internal_partial_clone() };
                 let this = this.allocation_strategy(value.clone().into());
@@ -256,7 +257,7 @@ impl PortFactoryServer {
                 let this = this.allocation_strategy(value.clone().into());
                 self.clone_local(this)
             }
-        }
+        })
     }
 
     /// Creates a new `Server` or emits a `ServerCreateError` on failure.

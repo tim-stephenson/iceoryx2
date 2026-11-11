@@ -10,6 +10,7 @@
 //
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
+use crate::public::Public;
 use core::mem::MaybeUninit;
 
 use iceoryx2::service::marker::{CustomHeaderMarker, CustomPayloadMarker};
@@ -103,10 +104,10 @@ impl RequestMutUninit {
         buffer_ptr: usize,
         buffer_len: usize,
         payload_offset: usize,
-    ) -> PyResult<RequestMut> {
+    ) -> PyResult<Public<RequestMut>> {
         let payload_ptr = (buffer_ptr + payload_offset) as *const u8;
         let payload_len = buffer_len - payload_offset;
-        match &mut *self.value.lock() {
+        (match &mut *self.value.lock() {
             RequestMutUninitType::Ipc(v) => {
                 let mut request = v.take().unwrap();
                 let mut memory_buffer = request.__internal_create_resizable_memory();
@@ -163,11 +164,12 @@ impl RequestMutUninit {
                     response_payload_type_details: self.response_payload_type_details.clone(),
                 })
             }
-        }
+        })
+        .map(Public)
     }
 
-    pub fn __assume_init(&self) -> RequestMut {
-        match &mut *self.value.lock() {
+    pub fn __assume_init(&self) -> Public<RequestMut> {
+        Public(match &mut *self.value.lock() {
             RequestMutUninitType::Ipc(v) => {
                 let request = v.take().unwrap();
                 RequestMut {
@@ -190,7 +192,7 @@ impl RequestMutUninit {
                     response_payload_type_details: self.response_payload_type_details.clone(),
                 }
             }
-        }
+        })
     }
 
     #[getter]

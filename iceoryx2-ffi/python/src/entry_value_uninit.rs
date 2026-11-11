@@ -10,6 +10,7 @@
 //
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
+use crate::public::Public;
 use iceoryx2_log::fatal_panic;
 use pyo3::prelude::*;
 
@@ -47,8 +48,8 @@ impl EntryValueUninit {
         }
     }
 
-    pub fn __update_write_cell(&mut self) -> EntryHandleMut {
-        match &mut *self.value.lock() {
+    pub fn __update_write_cell(&mut self) -> Public<EntryHandleMut> {
+        Public(match &mut *self.value.lock() {
             EntryValueUninitType::Ipc(v) => {
                 let entry_value_uninit = v.take().unwrap();
                 let entry_handle_mut = entry_value_uninit.update();
@@ -67,13 +68,13 @@ impl EntryValueUninit {
                     value_type_details: self.value_type_details.clone(),
                 }
             }
-        }
+        })
     }
 
     /// Discards the `EntryValueUninit` and returns the original
     /// `EntryHandleMut`.
-    pub fn discard(&mut self) -> EntryHandleMut {
-        match &mut *self.value.lock() {
+    pub fn discard(&mut self) -> Public<EntryHandleMut> {
+        Public(match &mut *self.value.lock() {
             EntryValueUninitType::Ipc(v) => {
                 let entry_value_uninit = v.take().unwrap();
                 let entry_handle_mut = entry_value_uninit.discard();
@@ -92,6 +93,6 @@ impl EntryValueUninit {
                     value_type_details: self.value_type_details.clone(),
                 }
             }
-        }
+        })
     }
 }

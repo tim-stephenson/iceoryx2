@@ -10,6 +10,7 @@
 //
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
+use crate::public::Public;
 use iceoryx2::prelude::{CallbackProgression, PortFactory};
 use iceoryx2::service::marker::{CustomHeaderMarker, CustomPayloadMarker};
 use pyo3::prelude::*;
@@ -200,12 +201,12 @@ impl PortFactoryPublishSubscribe {
     }
 
     /// Returns a `PortFactoryPublisher` to create a new `Publisher` port
-    pub fn publisher_builder(&self) -> PortFactoryPublisher {
-        PortFactoryPublisher::new(
+    pub fn publisher_builder(&self) -> Public<PortFactoryPublisher> {
+        Public(PortFactoryPublisher::new(
             self.value.clone(),
             self.payload_type_details.clone(),
             self.user_header_type_details.clone(),
-        )
+        ))
     }
 
     /// Returns a `PortFactorySubscriber` to create a new `Subscriber` port

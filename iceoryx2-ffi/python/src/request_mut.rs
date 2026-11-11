@@ -10,6 +10,7 @@
 //
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
+use crate::public::Public;
 use iceoryx2::service::marker::{CustomHeaderMarker, CustomPayloadMarker};
 use iceoryx2_log::fatal_panic;
 use pyo3::prelude::*;
@@ -138,8 +139,8 @@ impl RequestMut {
     }
 
     /// Sends the `RequestMut` to every connected `Server` of the `Service`.
-    pub fn send(&self) -> PyResult<PendingResponse> {
-        match &mut *self.value.lock() {
+    pub fn send(&self) -> PyResult<Public<PendingResponse>> {
+        (match &mut *self.value.lock() {
             RequestMutType::Ipc(v) => {
                 let request = v.take().unwrap();
                 Ok(PendingResponse {
@@ -168,6 +169,7 @@ impl RequestMut {
                     response_payload_type_details: self.response_payload_type_details.clone(),
                 })
             }
-        }
+        })
+        .map(Public)
     }
 }

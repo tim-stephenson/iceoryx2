@@ -10,6 +10,7 @@
 //
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
+use crate::public::Public;
 use iceoryx2::prelude::{CallbackProgression, PortFactory};
 use iceoryx2::service::marker::{CustomHeaderMarker, CustomPayloadMarker};
 use pyo3::prelude::*;
@@ -193,24 +194,24 @@ impl PortFactoryRequestResponse {
     }
 
     /// Returns a `PortFactoryServer` to create a new `Server` port
-    pub fn server_builder(&self) -> PortFactoryServer {
-        PortFactoryServer::new(
+    pub fn server_builder(&self) -> Public<PortFactoryServer> {
+        Public(PortFactoryServer::new(
             self.value.clone(),
             self.request_payload_type_details.clone(),
             self.response_payload_type_details.clone(),
             self.request_header_type_details.clone(),
             self.response_header_type_details.clone(),
-        )
+        ))
     }
 
     /// Returns a `PortFactoryClient` to create a new `Client` port
-    pub fn client_builder(&self) -> PortFactoryClient {
-        PortFactoryClient::new(
+    pub fn client_builder(&self) -> Public<PortFactoryClient> {
+        Public(PortFactoryClient::new(
             self.value.clone(),
             self.request_payload_type_details.clone(),
             self.response_payload_type_details.clone(),
             self.request_header_type_details.clone(),
             self.response_header_type_details.clone(),
-        )
+        ))
     }
 }

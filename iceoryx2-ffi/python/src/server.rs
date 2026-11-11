@@ -10,6 +10,7 @@
 //
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
+use crate::public::Public;
 use iceoryx2::service::marker::{CustomHeaderMarker, CustomPayloadMarker};
 use iceoryx2_log::fatal_panic;
 use pyo3::prelude::*;
@@ -126,8 +127,8 @@ impl Server {
 
     /// Receives a `RequestMut` that was sent by a `Client` and returns an `ActiveRequest`
     /// which can be used to respond. If no `RequestMut` was received it returns `None`.
-    pub fn receive(&self) -> PyResult<Option<ActiveRequest>> {
-        match &*self.value.lock() {
+    pub fn receive(&self) -> PyResult<Option<Public<ActiveRequest>>> {
+        (match &*self.value.lock() {
             ServerType::Ipc(Some(v)) => Ok(v
                 .receive()
                 .map_err(|e| ReceiveError::new_err(format!("{e:?}")))?
@@ -150,7 +151,8 @@ impl Server {
                 })),
             _ => fatal_panic!(from "Server::receive()",
                 "Accessing a released server."),
-        }
+        })
+        .map(|v| v.map(Public))
     }
 
     /// Releases the `Server`.

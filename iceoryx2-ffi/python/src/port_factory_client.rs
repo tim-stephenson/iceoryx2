@@ -10,6 +10,7 @@
 //
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
+use crate::public::Public;
 use crate::{error::ClientCreateError, type_storage::TypeStorage};
 use iceoryx2::service::marker::{CustomHeaderMarker, CustomPayloadMarker};
 use pyo3::prelude::*;
@@ -148,9 +149,9 @@ impl PortFactoryClient {
     /// If the user reduces the preallocated `RequestMut` count, iceoryx2 can
     /// no longer guarantee, that the `Client` can always loan a `RequestMut`
     /// to send.
-    pub fn override_request_preallocation(&self, value: usize) -> Self {
+    pub fn override_request_preallocation(&self, value: usize) -> Public<Self> {
         let _guard = self.factory.lock();
-        match &self.value {
+        Public(match &self.value {
             PortFactoryClientType::Ipc(v) => {
                 let this = unsafe { (*v.lock()).__internal_partial_clone() };
                 *self.override_request_preallocation.lock() = Some(value);
@@ -161,14 +162,14 @@ impl PortFactoryClient {
                 *self.override_request_preallocation.lock() = Some(value);
                 self.clone_local(this)
             }
-        }
+        })
     }
 
     /// Sets the `BackpressureStrategy` which defines how the `Client` shall behave
     /// when a `Server` cannot receive a `RequestMut` since its internal buffer is full.
-    pub fn backpressure_strategy(&self, value: &BackpressureStrategy) -> Self {
+    pub fn backpressure_strategy(&self, value: &BackpressureStrategy) -> Public<Self> {
         let _guard = self.factory.lock();
-        match &self.value {
+        Public(match &self.value {
             PortFactoryClientType::Ipc(v) => {
                 let this = unsafe { (*v.lock()).__internal_partial_clone() };
                 let this = this.backpressure_strategy(value.clone().into());
@@ -179,15 +180,15 @@ impl PortFactoryClient {
                 let this = this.backpressure_strategy(value.clone().into());
                 self.clone_local(this)
             }
-        }
+        })
     }
 
     /// The `PortName` that shall be assigned to the `Client`. It does not
     /// have to be unique. If no `PortName` is defined then the `Client`
     /// does not have a name.
-    pub fn name(&mut self, value: &PortName) -> Self {
+    pub fn name(&mut self, value: &PortName) -> Public<Self> {
         let _guard = self.factory.lock();
-        match &self.value {
+        Public(match &self.value {
             PortFactoryClientType::Ipc(v) => {
                 let this = unsafe { (*v.lock()).__internal_partial_clone() };
                 let this = this.name(&value.0);
@@ -198,14 +199,14 @@ impl PortFactoryClient {
                 let this = this.name(&value.0);
                 self.clone_local(this)
             }
-        }
+        })
     }
 
     /// Sets the maximum slice length that a user can allocate with
     /// `Client.loan_slice` or `Client.loan_slice_uninit`.
-    pub fn __initial_max_slice_len(&self, value: usize) -> Self {
+    pub fn __initial_max_slice_len(&self, value: usize) -> Public<Self> {
         let _guard = self.factory.lock();
-        match &self.value {
+        Public(match &self.value {
             PortFactoryClientType::Ipc(v) => {
                 let this = unsafe { (*v.lock()).__internal_partial_clone() };
                 let this = this.initial_max_slice_len(value);
@@ -216,15 +217,15 @@ impl PortFactoryClient {
                 let this = this.initial_max_slice_len(value);
                 self.clone_local(this)
             }
-        }
+        })
     }
 
     /// Defines the allocation strategy that is used when the provided
     /// `PortFactoryClient.initial_max_slice_len` is exhausted. This happens when the user
     /// acquires more than max slice len in `Client.loan_slice` or `Client.loan_slice_uninit`.
-    pub fn __allocation_strategy(&self, value: &AllocationStrategy) -> Self {
+    pub fn __allocation_strategy(&self, value: &AllocationStrategy) -> Public<Self> {
         let _guard = self.factory.lock();
-        match &self.value {
+        Public(match &self.value {
             PortFactoryClientType::Ipc(v) => {
                 let this = unsafe { (*v.lock()).__internal_partial_clone() };
                 let this = this.allocation_strategy(value.clone().into());
@@ -235,13 +236,13 @@ impl PortFactoryClient {
                 let this = this.allocation_strategy(value.clone().into());
                 self.clone_local(this)
             }
-        }
+        })
     }
 
     /// Defines the maximal active requests the `Client` can send. Smallest possible value is ``1``.
-    pub fn max_active_requests(&self, value: usize) -> Self {
+    pub fn max_active_requests(&self, value: usize) -> Public<Self> {
         let _guard = self.factory.lock();
-        match &self.value {
+        Public(match &self.value {
             PortFactoryClientType::Ipc(v) => {
                 let this = unsafe { (*v.lock()).__internal_partial_clone() };
                 let this = this.max_active_requests(value);
@@ -252,13 +253,13 @@ impl PortFactoryClient {
                 let this = this.max_active_requests(value);
                 self.clone_local(this)
             }
-        }
+        })
     }
 
     /// Creates a new `Client` or emits a `ClientCreateError` on failure.
-    pub fn create(&self) -> PyResult<Client> {
+    pub fn create(&self) -> PyResult<Public<Client>> {
         let _guard = self.factory.lock();
-        match &self.value {
+        (match &self.value {
             PortFactoryClientType::Ipc(v) => {
                 let this = unsafe { (*v.lock()).__internal_partial_clone() };
                 let this = match &*self.override_request_preallocation.lock() {
@@ -299,6 +300,7 @@ impl PortFactoryClient {
                     response_payload_type_details: self.response_payload_type_details.clone(),
                 })
             }
-        }
+        })
+        .map(Public)
     }
 }

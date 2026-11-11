@@ -10,6 +10,7 @@
 //
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
+use crate::public::Public;
 use iceoryx2::service::marker::{CustomHeaderMarker, CustomPayloadMarker};
 use iceoryx2_log::fatal_panic;
 use pyo3::prelude::*;
@@ -127,7 +128,7 @@ impl Client {
 
     /// Acquires an `RequestMutUninit` to store payload. This API shall be used
     /// by default to avoid unnecessary copies.
-    pub fn __loan_uninit(&self) -> PyResult<RequestMutUninit> {
+    pub fn __loan_uninit(&self) -> PyResult<Public<RequestMutUninit>> {
         self.__loan_slice_uninit(1)
     }
 
@@ -135,8 +136,8 @@ impl Client {
     /// The user has to initialize the payload before it can be sent.
     ///
     /// On failure it emits a `LoanError` describing the failure.
-    pub fn __loan_slice_uninit(&self, slice_len: usize) -> PyResult<RequestMutUninit> {
-        match &*self.value.lock() {
+    pub fn __loan_slice_uninit(&self, slice_len: usize) -> PyResult<Public<RequestMutUninit>> {
+        (match &*self.value.lock() {
             ClientType::Ipc(Some(v)) => Ok(RequestMutUninit {
                 value: Parc::new(RequestMutUninitType::Ipc(Some(unsafe {
                     v.loan_custom_payload(slice_len)
@@ -161,7 +162,8 @@ impl Client {
                 fatal_panic!(from "Client::loan_slice_uninit()",
                     "Accessing a released client.")
             }
-        }
+        })
+        .map(Public)
     }
 
     /// Returns the maximum initial slice length configured for this `Client`.

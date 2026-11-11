@@ -10,6 +10,7 @@
 //
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
+use crate::public::Public;
 use iceoryx2::service::marker::{CustomHeaderMarker, CustomPayloadMarker};
 use iceoryx2_log::fatal_panic;
 use pyo3::prelude::*;
@@ -177,7 +178,7 @@ impl ActiveRequest {
     }
 
     /// Loans uninitialized memory for a `ResponseMut` where the user can write its payload to.
-    pub fn __loan_uninit(&self) -> PyResult<ResponseMutUninit> {
+    pub fn __loan_uninit(&self) -> PyResult<Public<ResponseMutUninit>> {
         self.__loan_slice_uninit(1)
     }
 
@@ -185,8 +186,8 @@ impl ActiveRequest {
     /// `Server`. The user has to initialize the payload before it can be sent.
     ///
     /// On failure it emits `LoanError` describing the failure.
-    pub fn __loan_slice_uninit(&self, slice_len: usize) -> PyResult<ResponseMutUninit> {
-        match &*self.value.lock() {
+    pub fn __loan_slice_uninit(&self, slice_len: usize) -> PyResult<Public<ResponseMutUninit>> {
+        (match &*self.value.lock() {
             ActiveRequestType::Ipc(Some(v)) => Ok(ResponseMutUninit {
                 value: Parc::new(ResponseMutUninitType::Ipc(Some(unsafe {
                     v.loan_custom_payload(slice_len)
@@ -205,6 +206,7 @@ impl ActiveRequest {
             }),
             _ => fatal_panic!(from "ActiveRequest::loan_slice_uninit()",
                     "Accessing a released active request"),
-        }
+        })
+        .map(Public)
     }
 }

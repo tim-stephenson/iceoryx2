@@ -10,6 +10,7 @@
 //
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
+use crate::public::Public;
 use iceoryx2::service::marker::{CustomHeaderMarker, CustomPayloadMarker};
 use iceoryx2_bb_container::string::StaticString;
 use iceoryx2_bb_flatbuffers::TypeName;
@@ -96,8 +97,8 @@ impl ServiceBuilderPublishSubscribe {
 
     /// Defines the payload type. To be able to connect to a `Service` the `TypeDetail` must be
     /// identical in all participants since the communication is always strongly typed.
-    pub fn __payload_type_details(&self, value: &TypeDetail) -> Self {
-        match &self.value {
+    pub fn __payload_type_details(&self, value: &TypeDetail) -> Public<Self> {
+        Public(match &self.value {
             ServiceBuilderPublishSubscribeType::Ipc(v) => {
                 let this = v.clone();
                 let this = unsafe { this.__internal_set_payload_type_details(&value.0) };
@@ -108,13 +109,13 @@ impl ServiceBuilderPublishSubscribe {
                 let this = unsafe { this.__internal_set_payload_type_details(&value.0) };
                 self.clone_local(this)
             }
-        }
+        })
     }
 
     /// Defines the user header type. To be able to connect to a `Service` the `TypeDetail` must be
     /// identical in all participants since the communication is always strongly typed.
-    pub fn __user_header_type_details(&self, value: &TypeDetail) -> Self {
-        match &self.value {
+    pub fn __user_header_type_details(&self, value: &TypeDetail) -> Public<Self> {
+        Public(match &self.value {
             ServiceBuilderPublishSubscribeType::Ipc(v) => {
                 let this = v.clone();
                 let this = unsafe { this.__internal_set_user_header_type_details(&value.0) };
@@ -125,14 +126,14 @@ impl ServiceBuilderPublishSubscribe {
                 let this = unsafe { this.__internal_set_user_header_type_details(&value.0) };
                 self.clone_local(this)
             }
-        }
+        })
     }
 
     /// Overrides and increases the alignment of the payload - useful when the payload is used in
     /// SIMD operations. To be able to connect to a `Service` the payload alignment must be
     /// identical in all participants since the communication is always strongly typed.
-    pub fn payload_alignment(&self, value: &Alignment) -> Self {
-        match &self.value {
+    pub fn payload_alignment(&self, value: &Alignment) -> Public<Self> {
+        Public(match &self.value {
             ServiceBuilderPublishSubscribeType::Ipc(v) => {
                 let this = v.clone();
                 let this = this.payload_alignment(value.0);
@@ -143,13 +144,13 @@ impl ServiceBuilderPublishSubscribe {
                 let this = this.payload_alignment(value.0);
                 self.clone_local(this)
             }
-        }
+        })
     }
 
     /// If the `Service` is created, defines the overflow behavior of the service. If an existing
     /// `Service` is opened it requires the service to have the defined overflow behavior.
-    pub fn enable_safe_overflow(&self, value: bool) -> Self {
-        match &self.value {
+    pub fn enable_safe_overflow(&self, value: bool) -> Public<Self> {
+        Public(match &self.value {
             ServiceBuilderPublishSubscribeType::Ipc(v) => {
                 let this = v.clone();
                 let this = this.enable_safe_overflow(value);
@@ -160,14 +161,14 @@ impl ServiceBuilderPublishSubscribe {
                 let this = this.enable_safe_overflow(value);
                 self.clone_local(this)
             }
-        }
+        })
     }
 
     /// If the `Service` is created it defines the `Sample` count a
     /// `Subscriber` can borrow at most in parallel. If an existing
     /// `Service` is opened it defines the minimum required.
-    pub fn subscriber_max_borrowed_samples(&self, value: usize) -> Self {
-        match &self.value {
+    pub fn subscriber_max_borrowed_samples(&self, value: usize) -> Public<Self> {
+        Public(match &self.value {
             ServiceBuilderPublishSubscribeType::Ipc(v) => {
                 let this = v.clone();
                 let this = this.subscriber_max_borrowed_samples(value);
@@ -178,13 +179,13 @@ impl ServiceBuilderPublishSubscribe {
                 let this = this.subscriber_max_borrowed_samples(value);
                 self.clone_local(this)
             }
-        }
+        })
     }
 
     /// If the `Service` is created it defines the maximum history size a `Subscriber` can request
     /// on connection. If an existing `Service` is opened it defines the minimum required.
-    pub fn history_size(&self, value: usize) -> Self {
-        match &self.value {
+    pub fn history_size(&self, value: usize) -> Public<Self> {
+        Public(match &self.value {
             ServiceBuilderPublishSubscribeType::Ipc(v) => {
                 let this = v.clone();
                 let this = this.history_size(value);
@@ -195,13 +196,13 @@ impl ServiceBuilderPublishSubscribe {
                 let this = this.history_size(value);
                 self.clone_local(this)
             }
-        }
+        })
     }
 
     /// If the `Service` is created it defines how many `Sample` a `Subscriber` can store in its
     /// internal buffer. If an existing `Service` is opened it defines the minimum required.
-    pub fn subscriber_max_buffer_size(&self, value: usize) -> Self {
-        match &self.value {
+    pub fn subscriber_max_buffer_size(&self, value: usize) -> Public<Self> {
+        Public(match &self.value {
             ServiceBuilderPublishSubscribeType::Ipc(v) => {
                 let this = v.clone();
                 let this = this.subscriber_max_buffer_size(value);
@@ -212,14 +213,14 @@ impl ServiceBuilderPublishSubscribe {
                 let this = this.subscriber_max_buffer_size(value);
                 self.clone_local(this)
             }
-        }
+        })
     }
 
     /// If the `Service` is created it defines how many `Subscriber` shall be supported at
     /// most. If an existing `Service` is opened it defines how many `Subscriber` must be at
     /// least supported.
-    pub fn max_subscribers(&self, value: usize) -> Self {
-        match &self.value {
+    pub fn max_subscribers(&self, value: usize) -> Public<Self> {
+        Public(match &self.value {
             ServiceBuilderPublishSubscribeType::Ipc(v) => {
                 let this = v.clone();
                 let this = this.max_subscribers(value);
@@ -230,14 +231,14 @@ impl ServiceBuilderPublishSubscribe {
                 let this = this.max_subscribers(value);
                 self.clone_local(this)
             }
-        }
+        })
     }
 
     /// If the `Service` is created it defines how many `Publisher` shall be supported at
     /// most. If an existing `Service` is opened it defines how many `Publisher` must be at
     /// least supported.
-    pub fn max_publishers(&self, value: usize) -> Self {
-        match &self.value {
+    pub fn max_publishers(&self, value: usize) -> Public<Self> {
+        Public(match &self.value {
             ServiceBuilderPublishSubscribeType::Ipc(v) => {
                 let this = v.clone();
                 let this = this.max_publishers(value);
@@ -248,14 +249,14 @@ impl ServiceBuilderPublishSubscribe {
                 let this = this.max_publishers(value);
                 self.clone_local(this)
             }
-        }
+        })
     }
 
     /// If the `Service` is created it defines how many `Node` instances shall be able to open it in
     /// parallel. If an existing `Service` is opened it defines how many `Node` instances must be at
     /// least supported.
-    pub fn max_nodes(&self, value: usize) -> Self {
-        match &self.value {
+    pub fn max_nodes(&self, value: usize) -> Public<Self> {
+        Public(match &self.value {
             ServiceBuilderPublishSubscribeType::Ipc(v) => {
                 let this = v.clone();
                 let this = this.max_nodes(value);
@@ -266,17 +267,17 @@ impl ServiceBuilderPublishSubscribe {
                 let this = this.max_nodes(value);
                 self.clone_local(this)
             }
-        }
+        })
     }
 
-    pub fn __type_definition_name_hint(&self, name: &str, namespace: &str) -> Self {
+    pub fn __type_definition_name_hint(&self, name: &str, namespace: &str) -> Public<Self> {
         let type_name = TypeName {
             name: StaticString::from_str_truncated(name)
                 .expect("Typenames contain only valid UTF-8 characters."),
             namespace: StaticString::from_str_truncated(namespace)
                 .expect("Namespace names contain only valid UTF-8 characters."),
         };
-        match &self.value {
+        Public(match &self.value {
             ServiceBuilderPublishSubscribeType::Ipc(v) => {
                 let this = v.clone();
                 let this = this.__internal_type_definition_name_hint(&type_name);
@@ -287,11 +288,11 @@ impl ServiceBuilderPublishSubscribe {
                 let this = this.__internal_type_definition_name_hint(&type_name);
                 self.clone_local(this)
             }
-        }
+        })
     }
 
-    pub fn __flatbuffer_schema_path(&self, path: &FilePath) -> Self {
-        match &self.value {
+    pub fn __flatbuffer_schema_path(&self, path: &FilePath) -> Public<Self> {
+        Public(match &self.value {
             ServiceBuilderPublishSubscribeType::Ipc(v) => {
                 let this = v.clone();
                 let this = unsafe { this.__internal_flatbuffer_schema_path(&path.0) };
@@ -302,7 +303,7 @@ impl ServiceBuilderPublishSubscribe {
                 let this = unsafe { this.__internal_flatbuffer_schema_path(&path.0) };
                 self.clone_local(this)
             }
-        }
+        })
     }
 
     /// If the `Service` exists, it will be opened otherwise a new `Service` will be created.

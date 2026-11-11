@@ -31,3 +31,5 @@ features = ["abi3-py38"]
 
 [features]
 log = ["iceoryx2/log"]
+# Emits introspection data that `maturin generate-stubs` turns into the type stubs
+experimental-inspect = ["pyo3/experimental-inspect"]

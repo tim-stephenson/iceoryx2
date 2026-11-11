@@ -10,6 +10,7 @@
 //
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
+use crate::public::Public;
 use iceoryx2::service::marker::{CustomHeaderMarker, CustomPayloadMarker};
 use iceoryx2_bb_container::string::StaticString;
 use iceoryx2_bb_flatbuffers::TypeName;
@@ -124,8 +125,8 @@ impl ServiceBuilderRequestResponse {
     /// Defines the payload type for requests. To be able to connect to a `Service` the
     /// `TypeDetail` must be identical in all participants since the communication is always
     /// strongly typed.
-    pub fn __request_payload_type_details(&self, value: &TypeDetail) -> Self {
-        match &self.value {
+    pub fn __request_payload_type_details(&self, value: &TypeDetail) -> Public<Self> {
+        Public(match &self.value {
             ServiceBuilderRequestResponseType::Ipc(v) => {
                 let this = v.clone();
                 let this = unsafe { this.__internal_set_request_payload_type_details(&value.0) };
@@ -136,13 +137,13 @@ impl ServiceBuilderRequestResponse {
                 let this = unsafe { this.__internal_set_request_payload_type_details(&value.0) };
                 self.clone_local(this)
             }
-        }
+        })
     }
 
     /// Defines the request header type. To be able to connect to a `Service` the `TypeDetail` must
     /// be identical in all participants since the communication is always strongly typed.
-    pub fn __request_header_type_details(&self, value: &TypeDetail) -> Self {
-        match &self.value {
+    pub fn __request_header_type_details(&self, value: &TypeDetail) -> Public<Self> {
+        Public(match &self.value {
             ServiceBuilderRequestResponseType::Ipc(v) => {
                 let this = v.clone();
                 let this = unsafe { this.__internal_set_request_header_type_details(&value.0) };
@@ -153,14 +154,14 @@ impl ServiceBuilderRequestResponse {
                 let this = unsafe { this.__internal_set_request_header_type_details(&value.0) };
                 self.clone_local(this)
             }
-        }
+        })
     }
 
     /// Defines the payload type for responses. To be able to connect to a `Service` the
     /// `TypeDetail` must be identical in all participants since the communication is always
     /// strongly typed.
-    pub fn __response_payload_type_details(&self, value: &TypeDetail) -> Self {
-        match &self.value {
+    pub fn __response_payload_type_details(&self, value: &TypeDetail) -> Public<Self> {
+        Public(match &self.value {
             ServiceBuilderRequestResponseType::Ipc(v) => {
                 let this = v.clone();
                 let this = unsafe { this.__internal_set_response_payload_type_details(&value.0) };
@@ -171,13 +172,13 @@ impl ServiceBuilderRequestResponse {
                 let this = unsafe { this.__internal_set_response_payload_type_details(&value.0) };
                 self.clone_local(this)
             }
-        }
+        })
     }
 
     /// Defines the response header type. To be able to connect to a `Service` the `TypeDetail`
     /// must be identical in all participants since the communication is always strongly typed.
-    pub fn __response_header_type_details(&self, value: &TypeDetail) -> Self {
-        match &self.value {
+    pub fn __response_header_type_details(&self, value: &TypeDetail) -> Public<Self> {
+        Public(match &self.value {
             ServiceBuilderRequestResponseType::Ipc(v) => {
                 let this = v.clone();
                 let this = unsafe { this.__internal_set_response_header_type_details(&value.0) };
@@ -188,14 +189,14 @@ impl ServiceBuilderRequestResponse {
                 let this = unsafe { this.__internal_set_response_header_type_details(&value.0) };
                 self.clone_local(this)
             }
-        }
+        })
     }
 
     /// Overrides and increases the alignment of the request payload - useful when the payload is
     /// used in SIMD operations. To be able to connect to a `Service` the payload alignment must be
     /// identical in all participants since the communication is always strongly typed.
-    pub fn request_payload_alignment(&self, value: &Alignment) -> Self {
-        match &self.value {
+    pub fn request_payload_alignment(&self, value: &Alignment) -> Public<Self> {
+        Public(match &self.value {
             ServiceBuilderRequestResponseType::Ipc(v) => {
                 let this = v.clone();
                 let this = this.request_payload_alignment(value.0);
@@ -206,14 +207,14 @@ impl ServiceBuilderRequestResponse {
                 let this = this.request_payload_alignment(value.0);
                 self.clone_local(this)
             }
-        }
+        })
     }
 
     /// Overrides and increases the alignment of the response payload - useful when the payload is
     /// used in SIMD operations. To be able to connect to a `Service` the payload alignment must be
     /// identical in all participants since the communication is always strongly typed.
-    pub fn response_payload_alignment(&self, value: &Alignment) -> Self {
-        match &self.value {
+    pub fn response_payload_alignment(&self, value: &Alignment) -> Public<Self> {
+        Public(match &self.value {
             ServiceBuilderRequestResponseType::Ipc(v) => {
                 let this = v.clone();
                 let this = this.response_payload_alignment(value.0);
@@ -224,14 +225,14 @@ impl ServiceBuilderRequestResponse {
                 let this = this.response_payload_alignment(value.0);
                 self.clone_local(this)
             }
-        }
+        })
     }
 
     /// If the `Service` is created, defines the overflow behavior of the service for requests.
     /// If an existing `Service` is opened it requires the service to have the defined overflow
     /// behavior.
-    pub fn enable_safe_overflow_for_requests(&self, value: bool) -> Self {
-        match &self.value {
+    pub fn enable_safe_overflow_for_requests(&self, value: bool) -> Public<Self> {
+        Public(match &self.value {
             ServiceBuilderRequestResponseType::Ipc(v) => {
                 let this = v.clone();
                 let this = this.enable_safe_overflow_for_requests(value);
@@ -242,14 +243,14 @@ impl ServiceBuilderRequestResponse {
                 let this = this.enable_safe_overflow_for_requests(value);
                 self.clone_local(this)
             }
-        }
+        })
     }
 
     /// If the `Service` is created, defines the overflow behavior of the service for responses.
     /// If an existing `Service` is opened it requires the service to have the defined overflow
     /// behavior.
-    pub fn enable_safe_overflow_for_responses(&self, value: bool) -> Self {
-        match &self.value {
+    pub fn enable_safe_overflow_for_responses(&self, value: bool) -> Public<Self> {
+        Public(match &self.value {
             ServiceBuilderRequestResponseType::Ipc(v) => {
                 let this = v.clone();
                 let this = this.enable_safe_overflow_for_responses(value);
@@ -260,13 +261,13 @@ impl ServiceBuilderRequestResponse {
                 let this = this.enable_safe_overflow_for_responses(value);
                 self.clone_local(this)
             }
-        }
+        })
     }
 
     /// If the `Service` is created, defines the fire-and-forget behavior of the service for
     /// requests.
-    pub fn enable_fire_and_forget_requests(&self, value: bool) -> Self {
-        match &self.value {
+    pub fn enable_fire_and_forget_requests(&self, value: bool) -> Public<Self> {
+        Public(match &self.value {
             ServiceBuilderRequestResponseType::Ipc(v) => {
                 let this = v.clone();
                 let this = this.enable_fire_and_forget_requests(value);
@@ -277,14 +278,14 @@ impl ServiceBuilderRequestResponse {
                 let this = this.enable_fire_and_forget_requests(value);
                 self.clone_local(this)
             }
-        }
+        })
     }
 
     /// Defines how many active requests a `Server` can hold in
     /// parallel per `Client`. The objects are used to send answers to a request that was
     /// received earlier from a `Client`.
-    pub fn max_active_requests_per_client(&self, value: usize) -> Self {
-        match &self.value {
+    pub fn max_active_requests_per_client(&self, value: usize) -> Public<Self> {
+        Public(match &self.value {
             ServiceBuilderRequestResponseType::Ipc(v) => {
                 let this = v.clone();
                 let this = this.max_active_requests_per_client(value);
@@ -295,13 +296,13 @@ impl ServiceBuilderRequestResponse {
                 let this = this.max_active_requests_per_client(value);
                 self.clone_local(this)
             }
-        }
+        })
     }
 
     /// If the `Service` is created it defines how many `RequestMut` a
     /// `Client` can loan in parallel.
-    pub fn max_loaned_requests(&self, value: usize) -> Self {
-        match &self.value {
+    pub fn max_loaned_requests(&self, value: usize) -> Public<Self> {
+        Public(match &self.value {
             ServiceBuilderRequestResponseType::Ipc(v) => {
                 let this = v.clone();
                 let this = this.max_loaned_requests(value);
@@ -312,13 +313,13 @@ impl ServiceBuilderRequestResponse {
                 let this = this.max_loaned_requests(value);
                 self.clone_local(this)
             }
-        }
+        })
     }
 
     /// If the `Service` is created it defines how many responses fit in the
     /// `Client`'s buffer. If an existing `Service` is opened it defines the minimum required.
-    pub fn max_response_buffer_size(&self, value: usize) -> Self {
-        match &self.value {
+    pub fn max_response_buffer_size(&self, value: usize) -> Public<Self> {
+        Public(match &self.value {
             ServiceBuilderRequestResponseType::Ipc(v) => {
                 let this = v.clone();
                 let this = this.max_response_buffer_size(value);
@@ -329,14 +330,14 @@ impl ServiceBuilderRequestResponse {
                 let this = this.max_response_buffer_size(value);
                 self.clone_local(this)
             }
-        }
+        })
     }
 
     /// If the `Service` is created it defines how many `Server` ports shall
     /// be supported at most. If an existing `Service` is opened it defines how many
     /// `Server` ports must be at least supported.
-    pub fn max_servers(&self, value: usize) -> Self {
-        match &self.value {
+    pub fn max_servers(&self, value: usize) -> Public<Self> {
+        Public(match &self.value {
             ServiceBuilderRequestResponseType::Ipc(v) => {
                 let this = v.clone();
                 let this = this.max_servers(value);
@@ -347,14 +348,14 @@ impl ServiceBuilderRequestResponse {
                 let this = this.max_servers(value);
                 self.clone_local(this)
             }
-        }
+        })
     }
 
     /// If the `Service` is created it defines how many `Client` ports shall
     /// be supported at most. If an existing `Service` is opened it defines how many
     /// `Client` ports must be at least supported.
-    pub fn max_clients(&self, value: usize) -> Self {
-        match &self.value {
+    pub fn max_clients(&self, value: usize) -> Public<Self> {
+        Public(match &self.value {
             ServiceBuilderRequestResponseType::Ipc(v) => {
                 let this = v.clone();
                 let this = this.max_clients(value);
@@ -365,14 +366,14 @@ impl ServiceBuilderRequestResponse {
                 let this = this.max_clients(value);
                 self.clone_local(this)
             }
-        }
+        })
     }
 
     /// If the `Service` is created it defines how many `Node` instances shall
     /// be able to open it in parallel. If an existing `Service` is opened it defines how many
     /// `Node` instances must be at least supported.
-    pub fn max_nodes(&self, value: usize) -> Self {
-        match &self.value {
+    pub fn max_nodes(&self, value: usize) -> Public<Self> {
+        Public(match &self.value {
             ServiceBuilderRequestResponseType::Ipc(v) => {
                 let this = v.clone();
                 let this = this.max_nodes(value);
@@ -383,14 +384,14 @@ impl ServiceBuilderRequestResponse {
                 let this = this.max_nodes(value);
                 self.clone_local(this)
             }
-        }
+        })
     }
 
     /// If the `Service` is created it defines the `Response` count that shall
     /// be able to be borrowed in parallel per `PendingResponse`. If an
     /// existing `Service` is opened it defines how many borrows must be at least supported.
-    pub fn max_borrowed_responses_per_pending_response(&self, value: usize) -> Self {
-        match &self.value {
+    pub fn max_borrowed_responses_per_pending_response(&self, value: usize) -> Public<Self> {
+        Public(match &self.value {
             ServiceBuilderRequestResponseType::Ipc(v) => {
                 let this = v.clone();
                 let this = this.max_borrowed_responses_per_pending_response(value);
@@ -401,21 +402,21 @@ impl ServiceBuilderRequestResponse {
                 let this = this.max_borrowed_responses_per_pending_response(value);
                 self.clone_local(this)
             }
-        }
+        })
     }
 
     pub fn __internal_request_type_definition_name_hint(
         &self,
         name: &str,
         namespace: &str,
-    ) -> Self {
+    ) -> Public<Self> {
         let type_name = TypeName {
             name: StaticString::from_str_truncated(name)
                 .expect("Typenames contain only valid UTF-8 characters."),
             namespace: StaticString::from_str_truncated(namespace)
                 .expect("Namespace names contain only valid UTF-8 characters."),
         };
-        match &self.value {
+        Public(match &self.value {
             ServiceBuilderRequestResponseType::Ipc(v) => {
                 let this = v.clone();
                 let this = this.__internal_request_type_definition_name_hint(&type_name);
@@ -426,21 +427,21 @@ impl ServiceBuilderRequestResponse {
                 let this = this.__internal_request_type_definition_name_hint(&type_name);
                 self.clone_local(this)
             }
-        }
+        })
     }
 
     pub fn __internal_response_type_definition_name_hint(
         &self,
         name: &str,
         namespace: &str,
-    ) -> Self {
+    ) -> Public<Self> {
         let type_name = TypeName {
             name: StaticString::from_str_truncated(name)
                 .expect("Typenames contain only valid UTF-8 characters."),
             namespace: StaticString::from_str_truncated(namespace)
                 .expect("Namespace names contain only valid UTF-8 characters."),
         };
-        match &self.value {
+        Public(match &self.value {
             ServiceBuilderRequestResponseType::Ipc(v) => {
                 let this = v.clone();
                 let this = this.__internal_response_type_definition_name_hint(&type_name);
@@ -451,14 +452,14 @@ impl ServiceBuilderRequestResponse {
                 let this = this.__internal_response_type_definition_name_hint(&type_name);
                 self.clone_local(this)
             }
-        }
+        })
     }
 
     /// Sets the path to the flatbuffer schema file for the Request. If this is not explicitly
     /// defined, iceoryx2 will try to find the best fitting schema file in the configured
     /// filebuffer schema paths defined in the config.
-    pub fn __internal_request_flatbuffer_schema_path(&self, path: &FilePath) -> Self {
-        match &self.value {
+    pub fn __internal_request_flatbuffer_schema_path(&self, path: &FilePath) -> Public<Self> {
+        Public(match &self.value {
             ServiceBuilderRequestResponseType::Ipc(v) => {
                 let this = v.clone();
                 let this = unsafe { this.__internal_request_flatbuffer_schema_path(&path.0) };
@@ -469,14 +470,14 @@ impl ServiceBuilderRequestResponse {
                 let this = unsafe { this.__internal_request_flatbuffer_schema_path(&path.0) };
                 self.clone_local(this)
             }
-        }
+        })
     }
 
     /// Sets the path to the flatbuffer schema file for the Response. If this is not explicitly
     /// defined, iceoryx2 will try to find the best fitting schema file in the configured
     /// filebuffer schema paths defined in the config.
-    pub fn __internal_response_flatbuffer_schema_path(&self, path: &FilePath) -> Self {
-        match &self.value {
+    pub fn __internal_response_flatbuffer_schema_path(&self, path: &FilePath) -> Public<Self> {
+        Public(match &self.value {
             ServiceBuilderRequestResponseType::Ipc(v) => {
                 let this = v.clone();
                 let this = unsafe { this.__internal_response_flatbuffer_schema_path(&path.0) };
@@ -487,7 +488,7 @@ impl ServiceBuilderRequestResponse {
                 let this = unsafe { this.__internal_response_flatbuffer_schema_path(&path.0) };
                 self.clone_local(this)
             }
-        }
+        })
     }
 
     /// If the `Service` exists, it will be opened otherwise a new `Service` will be created.

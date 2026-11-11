@@ -10,6 +10,7 @@
 //
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
+use crate::public::Public;
 use iceoryx2::service::marker::CustomKeyMarker;
 use iceoryx2_log::fatal_panic;
 use pyo3::prelude::*;
@@ -113,9 +114,9 @@ impl PortFactoryReader {
     }
 
     /// Creates a new `Reader` or emits a `ReaderCreateError` on failure.
-    pub fn create(&self) -> PyResult<Reader> {
+    pub fn create(&self) -> PyResult<Public<Reader>> {
         let _guard = self.factory.lock();
-        match &self.value {
+        (match &self.value {
             PortFactoryReaderType::Ipc(v) => {
                 let this = (*v.lock()).clone();
                 Ok(Reader {
@@ -136,6 +137,7 @@ impl PortFactoryReader {
                     key_type_storage: self.key_type_storage.clone(),
                 })
             }
-        }
+        })
+        .map(Public)
     }
 }

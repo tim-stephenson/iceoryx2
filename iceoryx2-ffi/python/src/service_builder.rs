@@ -10,6 +10,7 @@
 //
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
+use crate::public::Public;
 use iceoryx2::service::marker::{CustomHeaderMarker, CustomKeyMarker, CustomPayloadMarker};
 use pyo3::prelude::*;
 
@@ -53,8 +54,8 @@ impl ServiceBuilder {
     }
 
     /// Create a new builder to create a `MessagingPattern.PublishSubscribe` `Service`.
-    pub fn __publish_subscribe(&self) -> ServiceBuilderPublishSubscribe {
-        match &*self.0.lock() {
+    pub fn __publish_subscribe(&self) -> Public<ServiceBuilderPublishSubscribe> {
+        Public(match &*self.0.lock() {
             ServiceBuilderType::Ipc(v) => {
                 let this = v.clone();
                 ServiceBuilderPublishSubscribe::new(ServiceBuilderPublishSubscribeType::Ipc(
@@ -69,12 +70,12 @@ impl ServiceBuilder {
                         .user_header::<CustomHeaderMarker>(),
                 ))
             }
-        }
+        })
     }
 
     /// Create a new builder to create a `MessagingPattern.RequestResponse` `Service`.
-    pub fn __request_response(&self) -> ServiceBuilderRequestResponse {
-        match &*self.0.lock() {
+    pub fn __request_response(&self) -> Public<ServiceBuilderRequestResponse> {
+        Public(match &*self.0.lock() {
             ServiceBuilderType::Ipc(v) => {
                 let this = v.clone();
                 ServiceBuilderRequestResponse::new(ServiceBuilderRequestResponseType::Ipc(
@@ -91,12 +92,12 @@ impl ServiceBuilder {
                         .response_user_header::<CustomHeaderMarker>(),
                 ))
             }
-        }
+        })
     }
 
     /// Create a new builder to create a `MessagingPattern.Blackboard` `Service`.
-    pub fn __blackboard_creator(&self) -> ServiceBuilderBlackboardCreator {
-        match &*self.0.lock() {
+    pub fn __blackboard_creator(&self) -> Public<ServiceBuilderBlackboardCreator> {
+        Public(match &*self.0.lock() {
             ServiceBuilderType::Ipc(v) => {
                 let this = v.clone();
                 ServiceBuilderBlackboardCreator::new(ServiceBuilderBlackboardCreatorType::Ipc(
@@ -109,7 +110,7 @@ impl ServiceBuilder {
                     Some(this.blackboard_creator::<CustomKeyMarker>()),
                 ))
             }
-        }
+        })
     }
 
     /// Create a new builder to open a `MessagingPattern.Blackboard` `Service`.
