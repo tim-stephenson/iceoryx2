@@ -45,6 +45,7 @@
 * [#2124](https://github.com/eclipse-iceoryx/iceoryx2/issues/2124) Remove clone impl from RelocatablePointer
 * [#2137](https://github.com/eclipse-iceoryx/iceoryx2/issues/2137) Fix typo in `BackpressureAction` enum
 * [#2142](https://github.com/eclipse-iceoryx/iceoryx2/issues/2142) Initialize the node counter of the global management segment when the segment is created
+* [#2183](https://github.com/eclipse-iceoryx/iceoryx2/issues/2183) Fix the return type annotations of the Python request-response builder and of `flatbuffer_schema_path`
 
 ### Refactoring
 
@@ -59,6 +60,7 @@
 * [#1977](https://github.com/eclipse-iceoryx/iceoryx2/issues/1977) Remove the former gateway core in `iceoryx2-gateway/`, superseded by the link crates
 * [#1977](https://github.com/eclipse-iceoryx/iceoryx2/issues/1977) Tidy up implementation of the link's discovery state
 * [#2010](https://github.com/eclipse-iceoryx/iceoryx2/issues/2010) Receive bytes from a tunnel directly into loaned samples
+* [#2183](https://github.com/eclipse-iceoryx/iceoryx2/issues/2183) Include the Python-side methods in the type stubs of the Python bindings
 
 ### Workflow
 
