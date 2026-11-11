@@ -12,17 +12,52 @@
 
 """Strong type safe extensions for the publish-subscribe messaging pattern."""
 
+from __future__ import annotations
+
 import ctypes
+import typing
 from typing import Any, Type, TypeVar, get_args, get_origin, overload
 
 import flatbuffers
 
+from ._extend import extends
 from ._iceoryx2 import *
+from .blackboard_extensions import blackboard_creator, blackboard_opener
 from .flatbuffer import Flatbuffer
+from .request_response_extensions import request_response
 from .slice import Slice
 from .type_name import get_type_name
 
-__all__: list[str] = []
+# isort: off
+if typing.TYPE_CHECKING:
+    from ._iceoryx2 import PortFactoryPublisher as _PortFactoryPublisher
+    from ._iceoryx2 import Publisher as _Publisher
+    from ._iceoryx2 import Sample as _Sample
+    from ._iceoryx2 import SampleMut as _SampleMut
+    from ._iceoryx2 import SampleMutUninit as _SampleMutUninit
+    from ._iceoryx2 import (
+        ServiceBuilderPublishSubscribe as _ServiceBuilderPublishSubscribe,
+    )
+    from ._iceoryx2 import ServiceBuilder as _ServiceBuilder
+else:
+    _PortFactoryPublisher = object
+    _Publisher = object
+    _Sample = object
+    _SampleMut = object
+    _SampleMutUninit = object
+    _ServiceBuilderPublishSubscribe = object
+    _ServiceBuilder = object
+# isort: on
+
+__all__ = [
+    "PortFactoryPublisher",
+    "Publisher",
+    "Sample",
+    "SampleMut",
+    "SampleMutUninit",
+    "ServiceBuilder",
+    "ServiceBuilderPublishSubscribe",
+]
 
 T = TypeVar("T", bound=ctypes.Structure)
 
@@ -248,7 +283,7 @@ def allocation_strategy(
 
 def flatbuffer_schema_path(
     self: ServiceBuilderPublishSubscribe, value: FilePath
-) -> PortFactoryPublisher:
+) -> ServiceBuilderPublishSubscribe:
     """
     Sets the path to the flatbuffer schema file.
 
@@ -332,7 +367,7 @@ def assume_init(self: SampleMutUninit, root=None) -> SampleMut:
     return initialized_sample
 
 
-_sample_mut_uninit_del_original = getattr(SampleMutUninit, "__del__", None)
+_sample_mut_uninit_del_original = getattr(SampleMutUninit, "__del__", None)  # type: ignore[used-before-def]
 
 
 def _sample_mut_uninit_del(self: SampleMutUninit) -> None:
@@ -341,34 +376,72 @@ def _sample_mut_uninit_del(self: SampleMutUninit) -> None:
         _sample_mut_uninit_del_original(self)
 
 
-PortFactoryPublisher.initial_max_slice_len = initial_max_slice_len
-PortFactoryPublisher.allocation_strategy = allocation_strategy
-PortFactoryPublisher.initial_reserved_memory = initial_reserved_memory
+@extends
+class PortFactoryPublisher(_PortFactoryPublisher):  # type: ignore[misc]
+    """Python-side extension of the Rust `PortFactoryPublisher`."""
 
-Publisher.send_copy = send_copy
-Publisher.loan_uninit = loan_uninit
-Publisher.loan_slice_uninit = loan_slice_uninit
-Publisher.loan_flatbuffer = loan_flatbuffer
+    initial_max_slice_len = initial_max_slice_len
+    allocation_strategy = allocation_strategy
+    initial_reserved_memory = initial_reserved_memory
 
-Sample.payload = payload
-Sample.user_header = user_header
-Sample.payload_bytes = payload_bytes
-Sample.payload_root = payload_root
 
-SampleMut.payload = payload
-SampleMut.user_header = user_header
-SampleMut.payload_bytes = payload_bytes
-SampleMut.payload_root = payload_root
-SampleMut.truncate = truncate
+@extends
+class Publisher(_Publisher):  # type: ignore[misc]
+    """Python-side extension of the Rust `Publisher`."""
 
-SampleMutUninit.write_payload = write_payload
-SampleMutUninit.payload = payload
-SampleMutUninit.user_header = user_header
-SampleMutUninit.flatbuffer_builder = flatbuffer_builder
-SampleMutUninit.assume_init = assume_init
-SampleMutUninit.truncate = truncate
-SampleMutUninit.__del__ = _sample_mut_uninit_del
+    send_copy = send_copy
+    loan_uninit = loan_uninit
+    loan_slice_uninit = loan_slice_uninit
+    loan_flatbuffer = loan_flatbuffer
 
-ServiceBuilder.publish_subscribe = publish_subscribe
-ServiceBuilderPublishSubscribe.user_header = set_user_header
-ServiceBuilderPublishSubscribe.flatbuffer_schema_path = flatbuffer_schema_path
+
+@extends
+class Sample(_Sample):  # type: ignore[misc]
+    """Python-side extension of the Rust `Sample`."""
+
+    payload = payload
+    user_header = user_header
+    payload_bytes = payload_bytes
+    payload_root = payload_root
+
+
+@extends
+class SampleMut(_SampleMut):  # type: ignore[misc]
+    """Python-side extension of the Rust `SampleMut`."""
+
+    payload = payload
+    user_header = user_header
+    payload_bytes = payload_bytes
+    payload_root = payload_root
+    truncate = truncate
+
+
+@extends
+class SampleMutUninit(_SampleMutUninit):  # type: ignore[misc]
+    """Python-side extension of the Rust `SampleMutUninit`."""
+
+    write_payload = write_payload
+    payload = payload
+    user_header = user_header
+    flatbuffer_builder = flatbuffer_builder
+    assume_init = assume_init
+    truncate = truncate
+    __del__ = _sample_mut_uninit_del
+
+
+@extends
+class ServiceBuilderPublishSubscribe(_ServiceBuilderPublishSubscribe):  # type: ignore[misc]
+    """Python-side extension of the Rust `ServiceBuilderPublishSubscribe`."""
+
+    user_header = set_user_header
+    flatbuffer_schema_path = flatbuffer_schema_path
+
+
+@extends
+class ServiceBuilder(_ServiceBuilder):  # type: ignore[misc]
+    """Python-side extension of the Rust `ServiceBuilder`."""
+
+    publish_subscribe = publish_subscribe
+    request_response = request_response
+    blackboard_creator = blackboard_creator
+    blackboard_opener = blackboard_opener

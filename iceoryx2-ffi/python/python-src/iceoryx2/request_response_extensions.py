@@ -12,17 +12,62 @@
 
 """Strong type safe extensions for the request-response messaging pattern."""
 
+from __future__ import annotations
+
 import ctypes
+import typing
 from typing import Any, Type, TypeVar, get_args, get_origin, overload
 
 import flatbuffers
 
+from ._extend import extends
 from ._iceoryx2 import *
 from .flatbuffer import Flatbuffer
 from .slice import Slice
 from .type_name import get_type_name
 
-__all__: list[str] = []
+# isort: off
+if typing.TYPE_CHECKING:
+    from ._iceoryx2 import (
+        ServiceBuilderRequestResponse as _ServiceBuilderRequestResponse,
+    )
+    from ._iceoryx2 import ActiveRequest as _ActiveRequest
+    from ._iceoryx2 import PortFactoryClient as _PortFactoryClient
+    from ._iceoryx2 import PortFactoryServer as _PortFactoryServer
+    from ._iceoryx2 import PendingResponse as _PendingResponse
+    from ._iceoryx2 import RequestMut as _RequestMut
+    from ._iceoryx2 import RequestMutUninit as _RequestMutUninit
+    from ._iceoryx2 import Response as _Response
+    from ._iceoryx2 import ResponseMut as _ResponseMut
+    from ._iceoryx2 import ResponseMutUninit as _ResponseMutUninit
+    from ._iceoryx2 import Client as _Client
+else:
+    _ServiceBuilderRequestResponse = object
+    _ActiveRequest = object
+    _PortFactoryClient = object
+    _PortFactoryServer = object
+    _PendingResponse = object
+    _RequestMut = object
+    _RequestMutUninit = object
+    _Response = object
+    _ResponseMut = object
+    _ResponseMutUninit = object
+    _Client = object
+# isort: on
+
+__all__ = [
+    "ActiveRequest",
+    "Client",
+    "PendingResponse",
+    "PortFactoryClient",
+    "PortFactoryServer",
+    "RequestMut",
+    "RequestMutUninit",
+    "Response",
+    "ResponseMut",
+    "ResponseMutUninit",
+    "ServiceBuilderRequestResponse",
+]
 
 ReqT = TypeVar("ReqT", bound=ctypes.Structure)
 ResT = TypeVar("ResT", bound=ctypes.Structure)
@@ -30,7 +75,7 @@ ResT = TypeVar("ResT", bound=ctypes.Structure)
 
 def request_response(
     self: ServiceBuilder, request: Type[ReqT], response: Type[ResT]
-) -> ServiceBuilderPublishSubscribe:
+) -> ServiceBuilderRequestResponse:
     """
     Returns the `ServiceBuilderRequestResponse` to create a new request-response service.
 
@@ -130,8 +175,8 @@ def request_response(
 
 
 def set_request_header(
-    self: ServiceBuilderPublishSubscribe, request: Type[ReqT]
-) -> ServiceBuilderPublishSubscribe:
+    self: ServiceBuilderRequestResponse, request: Type[ReqT]
+) -> ServiceBuilderRequestResponse:
     """Sets the request header type for the service."""
     type_name = get_type_name(request)
     result = self.__request_header_type_details(
@@ -146,8 +191,8 @@ def set_request_header(
 
 
 def set_response_header(
-    self: ServiceBuilderPublishSubscribe, response: Type[ResT]
-) -> ServiceBuilderPublishSubscribe:
+    self: ServiceBuilderRequestResponse, response: Type[ResT]
+) -> ServiceBuilderRequestResponse:
     """Sets the response header type for the service."""
     type_name = get_type_name(response)
     result = self.__response_header_type_details(
@@ -506,7 +551,7 @@ def assume_init_response(self: ResponseMutUninit, root=None) -> ResponseMut:
     return initialized_response
 
 
-_request_mut_uninit_del_original = getattr(RequestMutUninit, "__del__", None)
+_request_mut_uninit_del_original = getattr(RequestMutUninit, "__del__", None)  # type: ignore[used-before-def]
 
 
 def _request_mut_uninit_del(self: RequestMutUninit) -> None:
@@ -515,7 +560,7 @@ def _request_mut_uninit_del(self: RequestMutUninit) -> None:
         _request_mut_uninit_del_original(self)
 
 
-_response_mut_uninit_del_original = getattr(ResponseMutUninit, "__del__", None)
+_response_mut_uninit_del_original = getattr(ResponseMutUninit, "__del__", None)  # type: ignore[used-before-def]
 
 
 def _response_mut_uninit_del(self: ResponseMutUninit) -> None:
@@ -652,67 +697,117 @@ def initial_reserved_memory_response(
     return self.__initial_max_slice_len(value)
 
 
-ServiceBuilder.request_response = request_response
-ServiceBuilderRequestResponse.request_header = set_request_header
-ServiceBuilderRequestResponse.response_header = set_response_header
-ServiceBuilderRequestResponse.request_flatbuffer_schema_path = (
-    request_flatbuffer_schema_path
-)
-ServiceBuilderRequestResponse.response_flatbuffer_schema_path = (
-    response_flatbuffer_schema_path
-)
+@extends
+class ServiceBuilderRequestResponse(_ServiceBuilderRequestResponse):  # type: ignore[misc]
+    """Python-side extension of the Rust `ServiceBuilderRequestResponse`."""
 
-ActiveRequest.send_copy = send_response_copy
-ActiveRequest.payload = request_payload
-ActiveRequest.user_header = request_header
-ActiveRequest.payload_bytes = request_payload_bytes
-ActiveRequest.payload_root = request_payload_root
-ActiveRequest.loan_uninit = loan_uninit_response
-ActiveRequest.loan_flatbuffer = loan_flatbuffer_response
-ActiveRequest.loan_slice_uninit = loan_slice_uninit_response
+    request_header = set_request_header
+    response_header = set_response_header
+    request_flatbuffer_schema_path = request_flatbuffer_schema_path
+    response_flatbuffer_schema_path = response_flatbuffer_schema_path
 
-PortFactoryClient.initial_max_slice_len = initial_max_slice_len_request
-PortFactoryClient.allocation_strategy = allocation_strategy_request
-PortFactoryClient.initial_reserved_memory = initial_reserved_memory_request
-PortFactoryServer.initial_max_slice_len = initial_max_slice_len_response
-PortFactoryServer.allocation_strategy = allocation_strategy_response
-PortFactoryServer.initial_reserved_memory = initial_reserved_memory_response
 
-PendingResponse.payload = request_payload
-PendingResponse.user_header = request_header
-PendingResponse.payload_bytes = request_payload_bytes
-PendingResponse.payload_root = request_payload_root
+@extends
+class ActiveRequest(_ActiveRequest):  # type: ignore[misc]
+    """Python-side extension of the Rust `ActiveRequest`."""
 
-RequestMut.payload = request_payload
-RequestMut.user_header = request_header
-RequestMut.payload_bytes = request_payload_bytes
-RequestMut.payload_root = request_payload_root
+    send_copy = send_response_copy
+    payload = request_payload
+    user_header = request_header
+    payload_bytes = request_payload_bytes
+    payload_root = request_payload_root
+    loan_uninit = loan_uninit_response
+    loan_flatbuffer = loan_flatbuffer_response
+    loan_slice_uninit = loan_slice_uninit_response
 
-RequestMutUninit.payload = request_payload
-RequestMutUninit.user_header = request_header
-RequestMutUninit.flatbuffer_builder = flatbuffer_builder_request
-RequestMutUninit.assume_init = assume_init_request
-RequestMutUninit.write_payload = write_request_payload
-RequestMutUninit.__del__ = _request_mut_uninit_del
 
-Response.payload = response_payload
-Response.user_header = response_header
-Response.payload_bytes = response_payload_bytes
-Response.payload_root = response_payload_root
+@extends
+class PortFactoryClient(_PortFactoryClient):  # type: ignore[misc]
+    """Python-side extension of the Rust `PortFactoryClient`."""
 
-ResponseMut.payload = response_payload
-ResponseMut.user_header = response_header
-ResponseMut.payload_bytes = response_payload_bytes
-ResponseMut.payload_root = response_payload_root
+    initial_max_slice_len = initial_max_slice_len_request
+    allocation_strategy = allocation_strategy_request
+    initial_reserved_memory = initial_reserved_memory_request
 
-ResponseMutUninit.payload = response_payload
-ResponseMutUninit.user_header = response_header
-ResponseMutUninit.flatbuffer_builder = flatbuffer_builder_response
-ResponseMutUninit.assume_init = assume_init_response
-ResponseMutUninit.write_payload = write_response_payload
-ResponseMutUninit.__del__ = _response_mut_uninit_del
 
-Client.loan_uninit = loan_uninit_request
-Client.loan_slice_uninit = loan_slice_uninit_request
-Client.loan_flatbuffer = loan_flatbuffer_request
-Client.send_copy = send_request_copy
+@extends
+class PortFactoryServer(_PortFactoryServer):  # type: ignore[misc]
+    """Python-side extension of the Rust `PortFactoryServer`."""
+
+    initial_max_slice_len = initial_max_slice_len_response
+    allocation_strategy = allocation_strategy_response
+    initial_reserved_memory = initial_reserved_memory_response
+
+
+@extends
+class PendingResponse(_PendingResponse):  # type: ignore[misc]
+    """Python-side extension of the Rust `PendingResponse`."""
+
+    payload = request_payload
+    user_header = request_header
+    payload_bytes = request_payload_bytes
+    payload_root = request_payload_root
+
+
+@extends
+class RequestMut(_RequestMut):  # type: ignore[misc]
+    """Python-side extension of the Rust `RequestMut`."""
+
+    payload = request_payload
+    user_header = request_header
+    payload_bytes = request_payload_bytes
+    payload_root = request_payload_root
+
+
+@extends
+class RequestMutUninit(_RequestMutUninit):  # type: ignore[misc]
+    """Python-side extension of the Rust `RequestMutUninit`."""
+
+    payload = request_payload
+    user_header = request_header
+    flatbuffer_builder = flatbuffer_builder_request
+    assume_init = assume_init_request
+    write_payload = write_request_payload
+    __del__ = _request_mut_uninit_del
+
+
+@extends
+class Response(_Response):  # type: ignore[misc]
+    """Python-side extension of the Rust `Response`."""
+
+    payload = response_payload
+    user_header = response_header
+    payload_bytes = response_payload_bytes
+    payload_root = response_payload_root
+
+
+@extends
+class ResponseMut(_ResponseMut):  # type: ignore[misc]
+    """Python-side extension of the Rust `ResponseMut`."""
+
+    payload = response_payload
+    user_header = response_header
+    payload_bytes = response_payload_bytes
+    payload_root = response_payload_root
+
+
+@extends
+class ResponseMutUninit(_ResponseMutUninit):  # type: ignore[misc]
+    """Python-side extension of the Rust `ResponseMutUninit`."""
+
+    payload = response_payload
+    user_header = response_header
+    flatbuffer_builder = flatbuffer_builder_response
+    assume_init = assume_init_response
+    write_payload = write_response_payload
+    __del__ = _response_mut_uninit_del
+
+
+@extends
+class Client(_Client):  # type: ignore[misc]
+    """Python-side extension of the Rust `Client`."""
+
+    loan_uninit = loan_uninit_request
+    loan_slice_uninit = loan_slice_uninit_request
+    loan_flatbuffer = loan_flatbuffer_request
+    send_copy = send_request_copy

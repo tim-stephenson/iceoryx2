@@ -12,13 +12,48 @@
 
 """Strong type safe extensions for the blackboard messaging pattern."""
 
+from __future__ import annotations
+
 import ctypes
+import typing
 from typing import Any, Callable, Type, TypeVar
 
+from ._extend import extends
 from ._iceoryx2 import *
 from .type_name import get_type_name
 
-__all__ = ["BlackboardKey", "BlackboardValue"]
+# isort: off
+if typing.TYPE_CHECKING:
+    from ._iceoryx2 import EntryHandle as _EntryHandle
+    from ._iceoryx2 import EntryHandleMut as _EntryHandleMut
+    from ._iceoryx2 import EntryValueUninit as _EntryValueUninit
+    from ._iceoryx2 import PortFactoryBlackboard as _PortFactoryBlackboard
+    from ._iceoryx2 import Reader as _Reader
+    from ._iceoryx2 import (
+        ServiceBuilderBlackboardCreator as _ServiceBuilderBlackboardCreator,
+    )
+    from ._iceoryx2 import Writer as _Writer
+else:
+    _EntryHandle = object
+    _EntryHandleMut = object
+    _EntryValueUninit = object
+    _PortFactoryBlackboard = object
+    _Reader = object
+    _ServiceBuilderBlackboardCreator = object
+    _Writer = object
+# isort: on
+
+__all__ = [
+    "BlackboardKey",
+    "BlackboardValue",
+    "EntryHandle",
+    "EntryHandleMut",
+    "EntryValueUninit",
+    "PortFactoryBlackboard",
+    "Reader",
+    "ServiceBuilderBlackboardCreator",
+    "Writer",
+]
 
 K = TypeVar("K", bound=ctypes.Structure)
 V = TypeVar("V", bound=ctypes.Structure)
@@ -291,21 +326,53 @@ def assume_init_and_update(self: EntryValueUninit) -> EntryHandleMut:
     return self.__update_write_cell()
 
 
-EntryHandle.get = get
-EntryHandle.is_up_to_date = is_up_to_date
+@extends
+class EntryHandle(_EntryHandle):  # type: ignore[misc]
+    """Python-side extension of the Rust `EntryHandle`."""
 
-EntryHandleMut.update_with_copy = update_with_copy_on_entry_handle
+    get = get
+    is_up_to_date = is_up_to_date
 
-EntryValueUninit.assume_init_and_update = assume_init_and_update
-EntryValueUninit.update_with_copy = update_with_copy_on_entry_value
-EntryValueUninit.value_mut = value_mut
 
-PortFactoryBlackboard.list_keys = list_keys
+@extends
+class EntryHandleMut(_EntryHandleMut):  # type: ignore[misc]
+    """Python-side extension of the Rust `EntryHandleMut`."""
 
-Reader.entry = entry_handle
+    update_with_copy = update_with_copy_on_entry_handle
 
-ServiceBuilder.blackboard_creator = blackboard_creator
-ServiceBuilder.blackboard_opener = blackboard_opener
-ServiceBuilderBlackboardCreator.add = add
 
-Writer.entry = entry_handle_mut
+@extends
+class EntryValueUninit(_EntryValueUninit):  # type: ignore[misc]
+    """Python-side extension of the Rust `EntryValueUninit`."""
+
+    assume_init_and_update = assume_init_and_update
+    update_with_copy = update_with_copy_on_entry_value
+    value_mut = value_mut
+
+
+@extends
+class PortFactoryBlackboard(_PortFactoryBlackboard):  # type: ignore[misc]
+    """Python-side extension of the Rust `PortFactoryBlackboard`."""
+
+    list_keys = list_keys
+
+
+@extends
+class Reader(_Reader):  # type: ignore[misc]
+    """Python-side extension of the Rust `Reader`."""
+
+    entry = entry_handle
+
+
+@extends
+class ServiceBuilderBlackboardCreator(_ServiceBuilderBlackboardCreator):  # type: ignore[misc]
+    """Python-side extension of the Rust `ServiceBuilderBlackboardCreator`."""
+
+    add = add
+
+
+@extends
+class Writer(_Writer):  # type: ignore[misc]
+    """Python-side extension of the Rust `Writer`."""
+
+    entry = entry_handle_mut
