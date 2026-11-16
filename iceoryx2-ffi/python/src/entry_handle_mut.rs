@@ -11,6 +11,7 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
 use crate::public::Public;
+use crate::python_types;
 use iceoryx2_log::fatal_panic;
 use pyo3::prelude::*;
 
@@ -34,47 +35,6 @@ pub struct EntryHandleMut {
 
 #[pymethods]
 impl EntryHandleMut {
-    #[getter]
-    pub fn __value_type(&self) -> Option<Py<PyAny>> {
-        self.value_type_storage.clone().value
-    }
-
-    pub fn __set_value_type(&mut self, value: Py<PyAny>) {
-        self.value_type_storage.value = Some(value)
-    }
-
-    pub fn __get_data_ptr(&self, value_size: usize, value_alignment: usize) -> usize {
-        unsafe {
-            match &*self.value.lock() {
-                EntryHandleMutType::Ipc(Some(v)) => {
-                    v.__internal_get_ptr_to_write_cell(value_size, value_alignment) as usize
-                }
-                EntryHandleMutType::Local(Some(v)) => {
-                    v.__internal_get_ptr_to_write_cell(value_size, value_alignment) as usize
-                }
-                _ => {
-                    fatal_panic!(from "EntryHandleMut::update_with_copy()", "Accessing a deleted EntryHandleMut")
-                }
-            }
-        }
-    }
-
-    pub fn __update_data_ptr(&self) {
-        unsafe {
-            match &*self.value.lock() {
-                EntryHandleMutType::Ipc(Some(v)) => {
-                    v.__internal_update_write_cell();
-                }
-                EntryHandleMutType::Local(Some(v)) => {
-                    v.__internal_update_write_cell();
-                }
-                _ => {
-                    fatal_panic!(from "EntryHandleMut::update_with_copy()", "Accessing a deleted EntryHandleMut")
-                }
-            }
-        };
-    }
-
     /// Consumes the `EntryHandleMut` and loans an uninitialized entry value that can be used to
     /// update without copy.
     pub fn loan_uninit(&mut self) -> Public<EntryValueUninit> {
@@ -131,5 +91,53 @@ impl EntryHandleMut {
                 v.take();
             }
         }
+    }
+
+    /// Updates the value by copying the passed value into it.
+    pub fn update_with_copy(&self, value: &Bound<'_, PyAny>) -> PyResult<()> {
+        let size = python_types::ensure_layout(value, self.value_type_storage.value.as_ref())?;
+        let data_cell = self.get_data_ptr(size, python_types::alignment(value)?);
+        python_types::copy_bytes(value, data_cell, size)?;
+        self.update_data_ptr();
+        Ok(())
+    }
+}
+
+// Helpers of the Python-side methods that are no longer part of the Python API.
+impl EntryHandleMut {
+    pub(crate) fn set_value_type(&mut self, value: Py<PyAny>) {
+        self.value_type_storage.value = Some(value)
+    }
+
+    pub(crate) fn get_data_ptr(&self, value_size: usize, value_alignment: usize) -> usize {
+        unsafe {
+            match &*self.value.lock() {
+                EntryHandleMutType::Ipc(Some(v)) => {
+                    v.__internal_get_ptr_to_write_cell(value_size, value_alignment) as usize
+                }
+                EntryHandleMutType::Local(Some(v)) => {
+                    v.__internal_get_ptr_to_write_cell(value_size, value_alignment) as usize
+                }
+                _ => {
+                    fatal_panic!(from "EntryHandleMut::update_with_copy()", "Accessing a deleted EntryHandleMut")
+                }
+            }
+        }
+    }
+
+    pub(crate) fn update_data_ptr(&self) {
+        unsafe {
+            match &*self.value.lock() {
+                EntryHandleMutType::Ipc(Some(v)) => {
+                    v.__internal_update_write_cell();
+                }
+                EntryHandleMutType::Local(Some(v)) => {
+                    v.__internal_update_write_cell();
+                }
+                _ => {
+                    fatal_panic!(from "EntryHandleMut::update_with_copy()", "Accessing a deleted EntryHandleMut")
+                }
+            }
+        };
     }
 }

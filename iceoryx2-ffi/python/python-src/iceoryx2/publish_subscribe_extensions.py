@@ -16,50 +16,31 @@ from __future__ import annotations
 
 import ctypes
 import typing
-from typing import Any, Type, TypeVar, get_args, get_origin, overload
+from typing import Any, get_args, get_origin, overload
 
 import flatbuffers
 
 from ._extend import extends
 from ._iceoryx2 import *
-from .blackboard_extensions import blackboard_creator, blackboard_opener
 from .flatbuffer import Flatbuffer
-from .request_response_extensions import request_response
 from .slice import Slice
-from .type_name import get_type_name
 
 # isort: off
 if typing.TYPE_CHECKING:
-    from ._iceoryx2 import PortFactoryPublisher as _PortFactoryPublisher
-    from ._iceoryx2 import Publisher as _Publisher
     from ._iceoryx2 import Sample as _Sample
     from ._iceoryx2 import SampleMut as _SampleMut
     from ._iceoryx2 import SampleMutUninit as _SampleMutUninit
-    from ._iceoryx2 import (
-        ServiceBuilderPublishSubscribe as _ServiceBuilderPublishSubscribe,
-    )
-    from ._iceoryx2 import ServiceBuilder as _ServiceBuilder
 else:
-    _PortFactoryPublisher = object
-    _Publisher = object
     _Sample = object
     _SampleMut = object
     _SampleMutUninit = object
-    _ServiceBuilderPublishSubscribe = object
-    _ServiceBuilder = object
 # isort: on
 
 __all__ = [
-    "PortFactoryPublisher",
-    "Publisher",
     "Sample",
     "SampleMut",
     "SampleMutUninit",
-    "ServiceBuilder",
-    "ServiceBuilderPublishSubscribe",
 ]
-
-T = TypeVar("T", bound=ctypes.Structure)
 
 
 def payload_bytes(self: Any) -> Slice[ctypes.c_uint8]:
@@ -128,195 +109,6 @@ def user_header(self: Any) -> Any:
     return ptr
 
 
-def publish_subscribe(
-    self: ServiceBuilder, t: Type[T]
-) -> ServiceBuilderPublishSubscribe:
-    """Returns the `ServiceBuilderPublishSubscribe` to create a new publish-subscribe service. The payload ctype must be provided as argument."""
-    type_name = ""
-    type_size = 0
-    type_align = 0
-    type_variant = TypeVariant.FixedSize
-
-    if get_origin(t) is Flatbuffer:
-        (contained_type,) = get_args(t)
-        type_name = "iox2::Flatbuffer"
-        type_variant = TypeVariant.FixedSize
-        type_size = 1
-        type_align = 1
-    elif get_origin(t) is Slice:
-        (contained_type,) = get_args(t)
-        type_name = get_type_name(contained_type)
-        type_variant = TypeVariant.Dynamic
-        type_size = ctypes.sizeof(contained_type)
-        type_align = ctypes.alignment(contained_type)
-    else:
-        type_name = get_type_name(t)
-        type_size = ctypes.sizeof(t)
-        type_align = ctypes.alignment(t)
-        type_variant = TypeVariant.FixedSize
-
-    result = self.__publish_subscribe()
-    result.__set_payload_type(t)
-
-    if get_origin(t) is Flatbuffer:
-        (PayloadType,) = get_args(t)
-        result = result.__type_definition_name_hint(get_type_name(PayloadType), "")
-
-    return result.__payload_type_details(
-        TypeDetail.new()
-        .type_variant(type_variant)
-        .type_name(TypeName.new(type_name))
-        .size(type_size)
-        .alignment(type_align)
-    ).__user_header_type_details(
-        TypeDetail.new()
-        .type_variant(TypeVariant.FixedSize)
-        .type_name(TypeName.new("()"))
-        .size(0)
-        .alignment(1)
-    )
-
-
-def set_user_header(
-    self: ServiceBuilderPublishSubscribe, t: Type[T]
-) -> ServiceBuilderPublishSubscribe:
-    """Sets the user header type for the service."""
-    type_name = get_type_name(t)
-    result = self.__user_header_type_details(
-        TypeDetail.new()
-        .type_variant(TypeVariant.FixedSize)
-        .type_name(TypeName.new(type_name))
-        .size(ctypes.sizeof(t))
-        .alignment(ctypes.alignment(t))
-    )
-    result.__set_user_header_type(t)
-    return result
-
-
-def send_copy(self: Publisher, t: Type[T]) -> Any:
-    """Sends a copy of the provided type."""
-    assert (
-        self.__payload_type_details is not None
-        and get_origin(self.__payload_type_details) != Flatbuffer
-    )
-    sample_uninit = self.loan_uninit()
-
-    assert ctypes.sizeof(t) == ctypes.sizeof(sample_uninit.__payload_type_details)
-    assert ctypes.alignment(t) == ctypes.alignment(sample_uninit.__payload_type_details)
-
-    ctypes.memmove(sample_uninit.payload_ptr, ctypes.byref(t), ctypes.sizeof(t))
-    sample = sample_uninit.__assume_init()
-    return sample.send()
-
-
-def write_payload(self: SampleMutUninit, t: Type[T]) -> SampleMut:
-    """Writes the provided payload into the sample."""
-    assert (
-        self.__payload_type_details is not None
-        and get_origin(self.__payload_type_details) != Flatbuffer
-    )
-    assert ctypes.sizeof(t) == ctypes.sizeof(self.__payload_type_details)
-    assert ctypes.alignment(t) == ctypes.alignment(self.__payload_type_details)
-
-    ctypes.memmove(self.payload_ptr, ctypes.byref(t), ctypes.sizeof(t))
-    return self.__assume_init()
-
-
-def loan_uninit(self: Publisher) -> SampleMutUninit:
-    """
-    Loans/allocates a `SampleMutUninit` from the underlying data segment of the `Publisher`.
-
-    The user has to initialize the payload before it can be sent. On failure it returns
-    `LoanError` describing the failure.
-    """
-    origin = get_origin(self.__payload_type_details)
-    assert origin not in (Slice, Flatbuffer)
-
-    return self.__loan_uninit()
-
-
-def loan_slice_uninit(self: Publisher, number_of_elements: int) -> SampleMutUninit:
-    """
-    Loans/allocates a `SampleMutUninit` from the underlying data segment of the `Publisher`.
-
-    The user has to initialize the payload before it can be sent.
-    Fails when it is called for data types which are not a slice.
-    On failure it returns `LoanError` describing the failure.
-    """
-    assert get_origin(self.__payload_type_details) is Slice
-
-    return self.__loan_slice_uninit(number_of_elements)
-
-
-def truncate(self: Any, number_of_elements: int) -> None:
-    """
-    Shortens the payload to its first `number_of_elements` elements, so that only those are sent.
-
-    It has no effect when `number_of_elements` is not smaller than the current number of elements.
-    Fails when it is called for data types which are not a slice.
-    """
-    assert get_origin(self.__payload_type_details) is Slice
-
-    self.__truncate(number_of_elements)
-
-
-def initial_max_slice_len(
-    self: PortFactoryPublisher, value: int
-) -> PortFactoryPublisher:
-    """Sets the maximum slice length that a user can allocate."""
-    assert get_origin(self.__payload_type_details) is Slice
-
-    return self.__initial_max_slice_len(value)
-
-
-def allocation_strategy(
-    self: PortFactoryPublisher, value: AllocationStrategy
-) -> PortFactoryPublisher:
-    """Defines the allocation strategy that is used when the memory is exhausted."""
-    assert (
-        get_origin(self.__payload_type_details) is Slice
-        or get_origin(self.__payload_type_details) is Flatbuffer
-    )
-
-    return self.__allocation_strategy(value)
-
-
-def flatbuffer_schema_path(
-    self: ServiceBuilderPublishSubscribe, value: FilePath
-) -> ServiceBuilderPublishSubscribe:
-    """
-    Sets the path to the flatbuffer schema file.
-
-    If this is not explicitly defined, iceoryx2 will try to find the best fitting schema file
-    in the configured flatbuffer schema paths defined in the config.
-    """
-    assert get_origin(self.__get_payload_type_details) is Flatbuffer
-
-    return self.__flatbuffer_schema_path(value)
-
-
-def initial_reserved_memory(
-    self: PortFactoryPublisher, value: int
-) -> PortFactoryPublisher:
-    """Sets the maximum initial reserved memory that the underlying allocator reserves for the flatbuffer builder."""
-    assert get_origin(self.__payload_type_details) is Flatbuffer
-
-    return self.__initial_max_slice_len(value)
-
-
-def loan_flatbuffer(self: Publisher) -> SampleMutUninit:
-    """Loans/allocates a `SampleMutUninit` from the underlying data segment of the `Publisher` with an integrated flatbuffer builder."""
-    assert get_origin(self.__payload_type_details) is Flatbuffer
-
-    # Loaning a slice of 1 byte is exactly what we need here. The flatbuffer builder is
-    # in python not zero-copy and completely resides on the heap since they do not have
-    # an API to provide a custom allocator.
-    #
-    # When the data production is finished the sample payload is grown/resized and the
-    # serialized flatbuffer content is copied into the sample.
-    return self.__loan_slice_uninit(1)
-
-
 _sample_mut_uninit_dict: dict[int, flatbuffers.Builder] = {}
 
 
@@ -377,25 +169,6 @@ def _sample_mut_uninit_del(self: SampleMutUninit) -> None:
 
 
 @extends
-class PortFactoryPublisher(_PortFactoryPublisher):  # type: ignore[misc]
-    """Python-side extension of the Rust `PortFactoryPublisher`."""
-
-    initial_max_slice_len = initial_max_slice_len
-    allocation_strategy = allocation_strategy
-    initial_reserved_memory = initial_reserved_memory
-
-
-@extends
-class Publisher(_Publisher):  # type: ignore[misc]
-    """Python-side extension of the Rust `Publisher`."""
-
-    send_copy = send_copy
-    loan_uninit = loan_uninit
-    loan_slice_uninit = loan_slice_uninit
-    loan_flatbuffer = loan_flatbuffer
-
-
-@extends
 class Sample(_Sample):  # type: ignore[misc]
     """Python-side extension of the Rust `Sample`."""
 
@@ -413,35 +186,14 @@ class SampleMut(_SampleMut):  # type: ignore[misc]
     user_header = user_header
     payload_bytes = payload_bytes
     payload_root = payload_root
-    truncate = truncate
 
 
 @extends
 class SampleMutUninit(_SampleMutUninit):  # type: ignore[misc]
     """Python-side extension of the Rust `SampleMutUninit`."""
 
-    write_payload = write_payload
     payload = payload
     user_header = user_header
     flatbuffer_builder = flatbuffer_builder
     assume_init = assume_init
-    truncate = truncate
     __del__ = _sample_mut_uninit_del
-
-
-@extends
-class ServiceBuilderPublishSubscribe(_ServiceBuilderPublishSubscribe):  # type: ignore[misc]
-    """Python-side extension of the Rust `ServiceBuilderPublishSubscribe`."""
-
-    user_header = set_user_header
-    flatbuffer_schema_path = flatbuffer_schema_path
-
-
-@extends
-class ServiceBuilder(_ServiceBuilder):  # type: ignore[misc]
-    """Python-side extension of the Rust `ServiceBuilder`."""
-
-    publish_subscribe = publish_subscribe
-    request_response = request_response
-    blackboard_creator = blackboard_creator
-    blackboard_opener = blackboard_opener

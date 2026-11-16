@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import ctypes
 import typing
-from typing import Any, Type, TypeVar, get_args, get_origin, overload
+from typing import Any, get_args, get_origin, overload
 
 import flatbuffers
 
@@ -24,186 +24,35 @@ from ._extend import extends
 from ._iceoryx2 import *
 from .flatbuffer import Flatbuffer
 from .slice import Slice
-from .type_name import get_type_name
 
 # isort: off
 if typing.TYPE_CHECKING:
-    from ._iceoryx2 import (
-        ServiceBuilderRequestResponse as _ServiceBuilderRequestResponse,
-    )
     from ._iceoryx2 import ActiveRequest as _ActiveRequest
-    from ._iceoryx2 import PortFactoryClient as _PortFactoryClient
-    from ._iceoryx2 import PortFactoryServer as _PortFactoryServer
     from ._iceoryx2 import PendingResponse as _PendingResponse
     from ._iceoryx2 import RequestMut as _RequestMut
     from ._iceoryx2 import RequestMutUninit as _RequestMutUninit
     from ._iceoryx2 import Response as _Response
     from ._iceoryx2 import ResponseMut as _ResponseMut
     from ._iceoryx2 import ResponseMutUninit as _ResponseMutUninit
-    from ._iceoryx2 import Client as _Client
 else:
-    _ServiceBuilderRequestResponse = object
     _ActiveRequest = object
-    _PortFactoryClient = object
-    _PortFactoryServer = object
     _PendingResponse = object
     _RequestMut = object
     _RequestMutUninit = object
     _Response = object
     _ResponseMut = object
     _ResponseMutUninit = object
-    _Client = object
 # isort: on
 
 __all__ = [
     "ActiveRequest",
-    "Client",
     "PendingResponse",
-    "PortFactoryClient",
-    "PortFactoryServer",
     "RequestMut",
     "RequestMutUninit",
     "Response",
     "ResponseMut",
     "ResponseMutUninit",
-    "ServiceBuilderRequestResponse",
 ]
-
-ReqT = TypeVar("ReqT", bound=ctypes.Structure)
-ResT = TypeVar("ResT", bound=ctypes.Structure)
-
-
-def request_response(
-    self: ServiceBuilder, request: Type[ReqT], response: Type[ResT]
-) -> ServiceBuilderRequestResponse:
-    """
-    Returns the `ServiceBuilderRequestResponse` to create a new request-response service.
-
-    The request/response payload ctype must be provided as argument.
-    """
-    request_type_name = ""
-    request_type_size = 0
-    request_type_align = 0
-    request_type_variant = TypeVariant.FixedSize
-    response_type_name = ""
-    response_type_size = 0
-    response_type_align = 0
-    response_type_variant = TypeVariant.FixedSize
-
-    if get_origin(request) is Flatbuffer:
-        (contained_type,) = get_args(request)
-        request_type_name = "iox2::Flatbuffer"
-        request_type_variant = TypeVariant.FixedSize
-        request_type_size = 1
-        request_type_align = 1
-    elif get_origin(request) is Slice:
-        (contained_type,) = get_args(request)
-        request_type_name = get_type_name(contained_type)
-        request_type_variant = TypeVariant.Dynamic
-        request_type_size = ctypes.sizeof(contained_type)
-        request_type_align = ctypes.alignment(contained_type)
-    else:
-        request_type_name = get_type_name(request)
-        request_type_size = ctypes.sizeof(request)
-        request_type_align = ctypes.alignment(request)
-        request_type_variant = TypeVariant.FixedSize
-
-    if get_origin(response) is Flatbuffer:
-        (contained_type,) = get_args(response)
-        response_type_name = "iox2::Flatbuffer"
-        response_type_variant = TypeVariant.FixedSize
-        response_type_size = 1
-        response_type_align = 1
-    elif get_origin(response) is Slice:
-        (contained_type,) = get_args(response)
-        response_type_name = get_type_name(contained_type)
-        response_type_variant = TypeVariant.Dynamic
-        response_type_size = ctypes.sizeof(contained_type)
-        response_type_align = ctypes.alignment(contained_type)
-    else:
-        response_type_name = get_type_name(response)
-        response_type_size = ctypes.sizeof(response)
-        response_type_align = ctypes.alignment(response)
-        response_type_variant = TypeVariant.FixedSize
-
-    result = self.__request_response()
-    result.__set_request_payload_type(request)
-    result.__set_response_payload_type(response)
-
-    if get_origin(request) is Flatbuffer:
-        (PayloadType,) = get_args(request)
-        result = result.__internal_request_type_definition_name_hint(
-            get_type_name(PayloadType), ""
-        )
-
-    if get_origin(response) is Flatbuffer:
-        (PayloadType,) = get_args(response)
-        result = result.__internal_response_type_definition_name_hint(
-            get_type_name(PayloadType), ""
-        )
-
-    return (
-        result.__request_payload_type_details(
-            TypeDetail.new()
-            .type_variant(request_type_variant)
-            .type_name(TypeName.new(request_type_name))
-            .size(request_type_size)
-            .alignment(request_type_align)
-        )
-        .__request_header_type_details(
-            TypeDetail.new()
-            .type_variant(TypeVariant.FixedSize)
-            .type_name(TypeName.new("()"))
-            .size(0)
-            .alignment(1)
-        )
-        .__response_payload_type_details(
-            TypeDetail.new()
-            .type_variant(response_type_variant)
-            .type_name(TypeName.new(response_type_name))
-            .size(response_type_size)
-            .alignment(response_type_align)
-        )
-        .__response_header_type_details(
-            TypeDetail.new()
-            .type_variant(TypeVariant.FixedSize)
-            .type_name(TypeName.new("()"))
-            .size(0)
-            .alignment(1)
-        )
-    )
-
-
-def set_request_header(
-    self: ServiceBuilderRequestResponse, request: Type[ReqT]
-) -> ServiceBuilderRequestResponse:
-    """Sets the request header type for the service."""
-    type_name = get_type_name(request)
-    result = self.__request_header_type_details(
-        TypeDetail.new()
-        .type_variant(TypeVariant.FixedSize)
-        .type_name(TypeName.new(type_name))
-        .size(ctypes.sizeof(request))
-        .alignment(ctypes.alignment(request))
-    )
-    result.__set_request_header_type(request)
-    return result
-
-
-def set_response_header(
-    self: ServiceBuilderRequestResponse, response: Type[ResT]
-) -> ServiceBuilderRequestResponse:
-    """Sets the response header type for the service."""
-    type_name = get_type_name(response)
-    result = self.__response_header_type_details(
-        TypeDetail.new()
-        .type_variant(TypeVariant.FixedSize)
-        .type_name(TypeName.new(type_name))
-        .size(ctypes.sizeof(response))
-        .alignment(ctypes.alignment(response))
-    )
-    result.__set_response_header_type(response)
-    return result
 
 
 def request_payload(self: Any) -> Any:
@@ -343,114 +192,6 @@ def response_payload_root(self: Any) -> Any:
     return data
 
 
-def write_request_payload(self: RequestMutUninit, t: Type[ReqT]) -> RequestMut:
-    """Writes the provided payload into the request."""
-    assert (
-        self.__request_payload_type_details is not None
-        and get_origin(self.__request_payload_type_details) != Flatbuffer
-    )
-    assert ctypes.sizeof(t) == ctypes.sizeof(self.__request_payload_type_details)
-    assert ctypes.alignment(t) == ctypes.alignment(self.__request_payload_type_details)
-
-    ctypes.memmove(self.payload_ptr, ctypes.byref(t), ctypes.sizeof(t))
-    return self.__assume_init()
-
-
-def write_response_payload(self: ResponseMutUninit, t: Type[ReqT]) -> ResponseMut:
-    """Writes the provided payload into the response."""
-    assert (
-        self.__response_payload_type_details is not None
-        and get_origin(self.__response_payload_type_details) != Flatbuffer
-    )
-    assert ctypes.sizeof(t) == ctypes.sizeof(self.__response_payload_type_details)
-    assert ctypes.alignment(t) == ctypes.alignment(self.__response_payload_type_details)
-
-    ctypes.memmove(self.payload_ptr, ctypes.byref(t), ctypes.sizeof(t))
-    return self.__assume_init()
-
-
-def loan_uninit_request(self: Client) -> RequestMutUninit:
-    """
-    Loans/allocates memory from the underlying data segment.
-
-    The user has to initialize the payload before it can be sent. On failure it returns
-    `LoanError` describing the failure.
-    """
-    origin = get_origin(self.__request_payload_type_details)
-    assert origin not in (Slice, Flatbuffer)
-
-    return self.__loan_uninit()
-
-
-def loan_uninit_response(self: ActiveRequest) -> ResponseMutUninit:
-    """
-    Loans/allocates memory from the underlying data segment.
-
-    The user has to initialize the payload before it can be sent. On failure it returns
-    `LoanError` describing the failure.
-    """
-    origin = get_origin(self.__response_payload_type_details)
-    assert origin not in (Slice, Flatbuffer)
-
-    return self.__loan_uninit()
-
-
-def loan_slice_uninit_request(
-    self: Client, number_of_elements: int
-) -> RequestMutUninit:
-    """
-    Loans/allocates memory from the underlying data segment.
-
-    The user has to initialize the payload before it can be sent.
-    Fails when it is called for data types which are not a slice.
-    On failure it returns `LoanError` describing the failure.
-    """
-    assert get_origin(self.__request_payload_type_details) is Slice
-
-    return self.__loan_slice_uninit(number_of_elements)
-
-
-def loan_slice_uninit_response(
-    self: ActiveRequest, number_of_elements: int
-) -> ResponseMutUninit:
-    """
-    Loans/allocates memory from the underlying data segment.
-
-    The user has to initialize the payload before it can be sent.
-    Fails when it is called for data types which are not a slice.
-    On failure it returns `LoanError` describing the failure.
-    """
-    assert get_origin(self.__response_payload_type_details) is Slice
-
-    return self.__loan_slice_uninit(number_of_elements)
-
-
-def loan_flatbuffer_request(self: Client) -> RequestMutUninit:
-    """Loans/allocates a `RequestMutUninit` from the underlying data segment of the `Client` with an integrated flatbuffer builder."""
-    assert get_origin(self.__request_payload_type_details) is Flatbuffer
-
-    # Loaning a slice of 1 byte is exactly what we need here. The flatbuffer builder is
-    # in python not zero-copy and completely resides on the heap since they do not have
-    # an API to provide a custom allocator.
-    #
-    # When the data production is finished the request payload is grown/resized and the
-    # serialized flatbuffer content is copied into the request.
-    return self.__loan_slice_uninit(1)
-
-
-def loan_flatbuffer_response(self: ActiveRequest) -> ResponseMutUninit:
-    """Loans/allocates a `ResponseMutUninit` from the underlying data segment of the `Server` with an integrated flatbuffer builder."""
-    assert get_origin(self.__response_payload_type_details) is Flatbuffer
-
-    # Loaning a slice of 1 byte is exactly what we need here. The flatbuffer builder is
-    # in python not zero-copy and completely resides on the heap since they do not have
-    # an API to provide a custom allocator.
-    #
-    # When the data production is finished the response payload is grown/resized and the
-    # serialized flatbuffer content is copied into the response.
-    return self.__loan_slice_uninit(1)
-
-
 _request_mut_uninit_dict: dict[int, flatbuffers.Builder] = {}
 
 
@@ -569,174 +310,14 @@ def _response_mut_uninit_del(self: ResponseMutUninit) -> None:
         _response_mut_uninit_del_original(self)
 
 
-def initial_max_slice_len_request(
-    self: PortFactoryClient, value: int
-) -> PortFactoryClient:
-    """Sets the maximum slice length that a user can allocate."""
-    assert get_origin(self.__request_payload_type_details) is Slice
-
-    return self.__initial_max_slice_len(value)
-
-
-def initial_max_slice_len_response(
-    self: PortFactoryServer, value: int
-) -> PortFactoryServer:
-    """Sets the maximum slice length that a user can allocate."""
-    assert get_origin(self.__response_payload_type_details) is Slice
-
-    return self.__initial_max_slice_len(value)
-
-
-def allocation_strategy_request(
-    self: PortFactoryClient, value: AllocationStrategy
-) -> PortFactoryClient:
-    """Defines the allocation strategy that is used when the memory is exhausted."""
-    assert (
-        get_origin(self.__request_payload_type_details) is Slice
-        or get_origin(self.__request_payload_type_details) is Flatbuffer
-    )
-
-    return self.__allocation_strategy(value)
-
-
-def allocation_strategy_response(
-    self: PortFactoryServer, value: AllocationStrategy
-) -> PortFactoryServer:
-    """Defines the allocation strategy that is used when the memory is exhausted."""
-    assert (
-        get_origin(self.__response_payload_type_details) is Slice
-        or get_origin(self.__response_payload_type_details) is Flatbuffer
-    )
-
-    return self.__allocation_strategy(value)
-
-
-def send_request_copy(self: Client, t: Type[ReqT]) -> PendingResponse:
-    """Sends a copy of the provided type."""
-    assert (
-        self.__request_payload_type_details is not None
-        and get_origin(self.__request_payload_type_details) != Flatbuffer
-    )
-    request_uninit = self.__loan_uninit()
-
-    assert ctypes.sizeof(t) == ctypes.sizeof(
-        request_uninit.__request_payload_type_details
-    )
-    assert ctypes.alignment(t) == ctypes.alignment(
-        request_uninit.__request_payload_type_details
-    )
-
-    ctypes.memmove(request_uninit.payload_ptr, ctypes.byref(t), ctypes.sizeof(t))
-    request = request_uninit.__assume_init()
-    return request.send()
-
-
-def send_response_copy(self: ActiveRequest, t: Type[ResT]) -> Any:
-    """Sends a copy of the provided type."""
-    assert (
-        self.__response_payload_type_details is not None
-        and get_origin(self.__response_payload_type_details) != Flatbuffer
-    )
-    response_uninit = self.__loan_uninit()
-
-    assert ctypes.sizeof(t) == ctypes.sizeof(
-        response_uninit.__response_payload_type_details
-    )
-    assert ctypes.alignment(t) == ctypes.alignment(
-        response_uninit.__response_payload_type_details
-    )
-
-    ctypes.memmove(response_uninit.payload_ptr, ctypes.byref(t), ctypes.sizeof(t))
-    response = response_uninit.__assume_init()
-    return response.send()
-
-
-def request_flatbuffer_schema_path(
-    self: ServiceBuilderRequestResponse, value: FilePath
-) -> ServiceBuilderRequestResponse:
-    """
-    Sets the path to the flatbuffer schema file.
-
-    If this is not explicitly defined, iceoryx2 will try to find the best fitting schema file
-    in the configured filebuffer schema paths defined in the config.
-    """
-    assert get_origin(self.__get_request_payload_type_details) is Flatbuffer
-
-    return self.__internal_request_flatbuffer_schema_path(value)
-
-
-def response_flatbuffer_schema_path(
-    self: ServiceBuilderRequestResponse, value: FilePath
-) -> ServiceBuilderRequestResponse:
-    """
-    Sets the path to the flatbuffer schema file.
-
-    If this is not explicitly defined, iceoryx2 will try to find the best fitting schema file
-    in the configured filebuffer schema paths defined in the config.
-    """
-    assert get_origin(self.__get_response_payload_type_details) is Flatbuffer
-
-    return self.__internal_response_flatbuffer_schema_path(value)
-
-
-def initial_reserved_memory_request(
-    self: PortFactoryClient, value: int
-) -> PortFactoryClient:
-    """Sets the maximum initial reserved memory that the underlying allocator reserves for the flatbuffer builder."""
-    assert get_origin(self.__request_payload_type_details) is Flatbuffer
-
-    return self.__initial_max_slice_len(value)
-
-
-def initial_reserved_memory_response(
-    self: PortFactoryServer, value: int
-) -> PortFactoryServer:
-    """Sets the maximum initial reserved memory that the underlying allocator reserves for the flatbuffer builder."""
-    assert get_origin(self.__response_payload_type_details) is Flatbuffer
-
-    return self.__initial_max_slice_len(value)
-
-
-@extends
-class ServiceBuilderRequestResponse(_ServiceBuilderRequestResponse):  # type: ignore[misc]
-    """Python-side extension of the Rust `ServiceBuilderRequestResponse`."""
-
-    request_header = set_request_header
-    response_header = set_response_header
-    request_flatbuffer_schema_path = request_flatbuffer_schema_path
-    response_flatbuffer_schema_path = response_flatbuffer_schema_path
-
-
 @extends
 class ActiveRequest(_ActiveRequest):  # type: ignore[misc]
     """Python-side extension of the Rust `ActiveRequest`."""
 
-    send_copy = send_response_copy
     payload = request_payload
     user_header = request_header
     payload_bytes = request_payload_bytes
     payload_root = request_payload_root
-    loan_uninit = loan_uninit_response
-    loan_flatbuffer = loan_flatbuffer_response
-    loan_slice_uninit = loan_slice_uninit_response
-
-
-@extends
-class PortFactoryClient(_PortFactoryClient):  # type: ignore[misc]
-    """Python-side extension of the Rust `PortFactoryClient`."""
-
-    initial_max_slice_len = initial_max_slice_len_request
-    allocation_strategy = allocation_strategy_request
-    initial_reserved_memory = initial_reserved_memory_request
-
-
-@extends
-class PortFactoryServer(_PortFactoryServer):  # type: ignore[misc]
-    """Python-side extension of the Rust `PortFactoryServer`."""
-
-    initial_max_slice_len = initial_max_slice_len_response
-    allocation_strategy = allocation_strategy_response
-    initial_reserved_memory = initial_reserved_memory_response
 
 
 @extends
@@ -767,7 +348,6 @@ class RequestMutUninit(_RequestMutUninit):  # type: ignore[misc]
     user_header = request_header
     flatbuffer_builder = flatbuffer_builder_request
     assume_init = assume_init_request
-    write_payload = write_request_payload
     __del__ = _request_mut_uninit_del
 
 
@@ -799,15 +379,4 @@ class ResponseMutUninit(_ResponseMutUninit):  # type: ignore[misc]
     user_header = response_header
     flatbuffer_builder = flatbuffer_builder_response
     assume_init = assume_init_response
-    write_payload = write_response_payload
     __del__ = _response_mut_uninit_del
-
-
-@extends
-class Client(_Client):  # type: ignore[misc]
-    """Python-side extension of the Rust `Client`."""
-
-    loan_uninit = loan_uninit_request
-    loan_slice_uninit = loan_slice_uninit_request
-    loan_flatbuffer = loan_flatbuffer_request
-    send_copy = send_request_copy

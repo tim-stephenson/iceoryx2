@@ -11,6 +11,7 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
 use crate::public::Public;
+use crate::python_types::{self, PayloadKind, ensure};
 use iceoryx2::service::marker::{CustomHeaderMarker, CustomPayloadMarker};
 use iceoryx2_log::fatal_panic;
 use pyo3::prelude::*;
@@ -65,11 +66,6 @@ impl ActiveRequest {
     #[getter]
     pub fn __request_header_type_details(&self) -> Option<Py<PyAny>> {
         self.request_header_type_details.clone().value
-    }
-
-    #[getter]
-    pub fn __response_payload_type_details(&self) -> Option<Py<PyAny>> {
-        self.response_payload_type_details.clone().value
     }
 
     #[getter]
@@ -177,17 +173,78 @@ impl ActiveRequest {
         }
     }
 
-    /// Loans uninitialized memory for a `ResponseMut` where the user can write its payload to.
-    pub fn __loan_uninit(&self) -> PyResult<Public<ResponseMutUninit>> {
-        self.__loan_slice_uninit(1)
+    /// Loans/allocates memory from the underlying data segment.
+    ///
+    /// The user has to initialize the payload before it can be sent. On failure it returns
+    /// `LoanError` describing the failure.
+    pub fn loan_uninit(&self) -> PyResult<Public<ResponseMutUninit>> {
+        ensure(
+            self.response_payload_type_details.kind == PayloadKind::FixedSize,
+            "`loan_uninit()` is not available for `Slice` or `Flatbuffer` payloads",
+        )?;
+        self.loan_slice_uninit_unchecked(1).map(Public)
     }
 
+    /// Loans/allocates memory from the underlying data segment.
+    ///
+    /// The user has to initialize the payload before it can be sent.
+    /// Fails when it is called for data types which are not a slice.
+    /// On failure it returns `LoanError` describing the failure.
+    pub fn loan_slice_uninit(
+        &self,
+        number_of_elements: usize,
+    ) -> PyResult<Public<ResponseMutUninit>> {
+        ensure(
+            self.response_payload_type_details.kind == PayloadKind::Slice,
+            "`loan_slice_uninit()` requires a `Slice` payload",
+        )?;
+        self.loan_slice_uninit_unchecked(number_of_elements)
+            .map(Public)
+    }
+
+    /// Loans/allocates a `ResponseMutUninit` from the underlying data segment of the `Server` with
+    /// an integrated flatbuffer builder.
+    pub fn loan_flatbuffer(&self) -> PyResult<Public<ResponseMutUninit>> {
+        ensure(
+            self.response_payload_type_details.kind == PayloadKind::Flatbuffer,
+            "`loan_flatbuffer()` requires a `Flatbuffer` payload",
+        )?;
+        // Loaning a slice of 1 byte is exactly what we need here. The flatbuffer builder is
+        // in python not zero-copy and completely resides on the heap since they do not have
+        // an API to provide a custom allocator.
+        //
+        // When the data production is finished the payload is grown/resized and the
+        // serialized flatbuffer content is copied into it.
+        self.loan_slice_uninit_unchecked(1).map(Public)
+    }
+
+    /// Sends a copy of the provided value.
+    pub fn send_copy(&self, t: &Bound<'_, PyAny>) -> PyResult<()> {
+        ensure(
+            self.response_payload_type_details.kind != PayloadKind::Flatbuffer,
+            "`send_copy()` is not available for `Flatbuffer` payloads",
+        )?;
+        let uninit = self.loan_slice_uninit_unchecked(1)?;
+        python_types::copy_value(
+            t,
+            self.response_payload_type_details.value.as_ref(),
+            uninit.payload_ptr(),
+        )?;
+        uninit.__assume_init().0.send()
+    }
+}
+
+// Helpers of the Python-side methods that are no longer part of the Python API.
+impl ActiveRequest {
     /// Loans/allocates a `ResponseMutUninit` from the underlying data segment of the
     /// `Server`. The user has to initialize the payload before it can be sent.
     ///
     /// On failure it emits `LoanError` describing the failure.
-    pub fn __loan_slice_uninit(&self, slice_len: usize) -> PyResult<Public<ResponseMutUninit>> {
-        (match &*self.value.lock() {
+    pub(crate) fn loan_slice_uninit_unchecked(
+        &self,
+        slice_len: usize,
+    ) -> PyResult<ResponseMutUninit> {
+        match &*self.value.lock() {
             ActiveRequestType::Ipc(Some(v)) => Ok(ResponseMutUninit {
                 value: Parc::new(ResponseMutUninitType::Ipc(Some(unsafe {
                     v.loan_custom_payload(slice_len)
@@ -206,7 +263,6 @@ impl ActiveRequest {
             }),
             _ => fatal_panic!(from "ActiveRequest::loan_slice_uninit()",
                     "Accessing a released active request"),
-        })
-        .map(Public)
+        }
     }
 }

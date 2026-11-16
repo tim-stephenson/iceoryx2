@@ -18,19 +18,19 @@ the extension modules write their additions as a class that, for type checkers o
 derives from the Rust class:
 
     if TYPE_CHECKING:
-        from ._iceoryx2 import Publisher as _Publisher
+        from ._iceoryx2 import Sample as _Sample
     else:
-        _Publisher = object
+        _Sample = object
 
     @extends
-    class Publisher(_Publisher):
-        send_copy = send_copy
+    class Sample(_Sample):
+        payload = payload
 
-For type checkers and language servers `extends` is the identity, so `Publisher`
+For type checkers and language servers `extends` is the identity, so `Sample`
 is the Rust class plus the Python-side methods. The Rust stubs refer to the
-public `iceoryx2.Publisher` (see `src/public.rs`), so objects returned from Rust
+public `iceoryx2.Sample` (see `src/public.rs`), so objects returned from Rust
 have these methods as well. At runtime `extends` attaches the members to the
-Rust class and returns it, so `iceoryx2.Publisher is iceoryx2._iceoryx2.Publisher`.
+Rust class and returns it, so `iceoryx2.Sample is iceoryx2._iceoryx2.Sample`.
 """
 
 from typing import TypeVar

@@ -10,7 +10,9 @@
 //
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
+use crate::pending_response::PendingResponse;
 use crate::public::Public;
+use crate::python_types::{self, PayloadKind, ensure};
 use iceoryx2::service::marker::{CustomHeaderMarker, CustomPayloadMarker};
 use iceoryx2_log::fatal_panic;
 use pyo3::prelude::*;
@@ -57,11 +59,6 @@ pub struct Client {
 
 #[pymethods]
 impl Client {
-    #[getter]
-    pub fn __request_payload_type_details(&self) -> Option<Py<PyAny>> {
-        self.request_payload_type_details.clone().value
-    }
-
     #[getter]
     pub fn __request_header_type_details(&self) -> Option<Py<PyAny>> {
         self.request_header_type_details.clone().value
@@ -126,18 +123,100 @@ impl Client {
         }
     }
 
-    /// Acquires an `RequestMutUninit` to store payload. This API shall be used
-    /// by default to avoid unnecessary copies.
-    pub fn __loan_uninit(&self) -> PyResult<Public<RequestMutUninit>> {
-        self.__loan_slice_uninit(1)
+    /// Returns the maximum initial slice length configured for this `Client`.
+    pub fn initial_max_slice_len(&self) -> usize {
+        match &*self.value.lock() {
+            ClientType::Ipc(Some(v)) => v.initial_max_slice_len(),
+            ClientType::Local(Some(v)) => v.initial_max_slice_len(),
+            _ => {
+                fatal_panic!(from "Client::initial_max_slice_len()",
+                    "Accessing a released client.")
+            }
+        }
     }
 
+    #[getter]
+    /// Returns the maximum amount of active requests the `Client` can send.
+    pub fn max_active_requests(&self) -> usize {
+        match &*self.value.lock() {
+            ClientType::Ipc(Some(v)) => v.max_active_requests(),
+            ClientType::Local(Some(v)) => v.max_active_requests(),
+            _ => fatal_panic!(from "Client::max_active_requests()", "Accessing a released client."),
+        }
+    }
+
+    /// Loans/allocates memory from the underlying data segment.
+    ///
+    /// The user has to initialize the payload before it can be sent. On failure it returns
+    /// `LoanError` describing the failure.
+    pub fn loan_uninit(&self) -> PyResult<Public<RequestMutUninit>> {
+        ensure(
+            self.request_payload_type_details.kind == PayloadKind::FixedSize,
+            "`loan_uninit()` is not available for `Slice` or `Flatbuffer` payloads",
+        )?;
+        self.loan_slice_uninit_unchecked(1).map(Public)
+    }
+
+    /// Loans/allocates memory from the underlying data segment.
+    ///
+    /// The user has to initialize the payload before it can be sent.
+    /// Fails when it is called for data types which are not a slice.
+    /// On failure it returns `LoanError` describing the failure.
+    pub fn loan_slice_uninit(
+        &self,
+        number_of_elements: usize,
+    ) -> PyResult<Public<RequestMutUninit>> {
+        ensure(
+            self.request_payload_type_details.kind == PayloadKind::Slice,
+            "`loan_slice_uninit()` requires a `Slice` payload",
+        )?;
+        self.loan_slice_uninit_unchecked(number_of_elements)
+            .map(Public)
+    }
+
+    /// Loans/allocates a `RequestMutUninit` from the underlying data segment of the `Client` with
+    /// an integrated flatbuffer builder.
+    pub fn loan_flatbuffer(&self) -> PyResult<Public<RequestMutUninit>> {
+        ensure(
+            self.request_payload_type_details.kind == PayloadKind::Flatbuffer,
+            "`loan_flatbuffer()` requires a `Flatbuffer` payload",
+        )?;
+        // Loaning a slice of 1 byte is exactly what we need here. The flatbuffer builder is
+        // in python not zero-copy and completely resides on the heap since they do not have
+        // an API to provide a custom allocator.
+        //
+        // When the data production is finished the payload is grown/resized and the
+        // serialized flatbuffer content is copied into it.
+        self.loan_slice_uninit_unchecked(1).map(Public)
+    }
+
+    /// Sends a copy of the provided value.
+    pub fn send_copy(&self, t: &Bound<'_, PyAny>) -> PyResult<Public<PendingResponse>> {
+        ensure(
+            self.request_payload_type_details.kind != PayloadKind::Flatbuffer,
+            "`send_copy()` is not available for `Flatbuffer` payloads",
+        )?;
+        let uninit = self.loan_slice_uninit_unchecked(1)?;
+        python_types::copy_value(
+            t,
+            self.request_payload_type_details.value.as_ref(),
+            uninit.payload_ptr(),
+        )?;
+        uninit.__assume_init().0.send()
+    }
+}
+
+// Helpers of the Python-side methods that are no longer part of the Python API.
+impl Client {
     /// Loans/allocates a `RequestMutUninit` from the underlying data segment of the `Client`.
     /// The user has to initialize the payload before it can be sent.
     ///
     /// On failure it emits a `LoanError` describing the failure.
-    pub fn __loan_slice_uninit(&self, slice_len: usize) -> PyResult<Public<RequestMutUninit>> {
-        (match &*self.value.lock() {
+    pub(crate) fn loan_slice_uninit_unchecked(
+        &self,
+        slice_len: usize,
+    ) -> PyResult<RequestMutUninit> {
+        match &*self.value.lock() {
             ClientType::Ipc(Some(v)) => Ok(RequestMutUninit {
                 value: Parc::new(RequestMutUninitType::Ipc(Some(unsafe {
                     v.loan_custom_payload(slice_len)
@@ -162,29 +241,6 @@ impl Client {
                 fatal_panic!(from "Client::loan_slice_uninit()",
                     "Accessing a released client.")
             }
-        })
-        .map(Public)
-    }
-
-    /// Returns the maximum initial slice length configured for this `Client`.
-    pub fn initial_max_slice_len(&self) -> usize {
-        match &*self.value.lock() {
-            ClientType::Ipc(Some(v)) => v.initial_max_slice_len(),
-            ClientType::Local(Some(v)) => v.initial_max_slice_len(),
-            _ => {
-                fatal_panic!(from "Client::initial_max_slice_len()",
-                    "Accessing a released client.")
-            }
-        }
-    }
-
-    #[getter]
-    /// Returns the maximum amount of active requests the `Client` can send.
-    pub fn max_active_requests(&self) -> usize {
-        match &*self.value.lock() {
-            ClientType::Ipc(Some(v)) => v.max_active_requests(),
-            ClientType::Local(Some(v)) => v.max_active_requests(),
-            _ => fatal_panic!(from "Client::max_active_requests()", "Accessing a released client."),
         }
     }
 }

@@ -11,6 +11,7 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
 use crate::public::Public;
+use crate::python_types::{self, PayloadKind, ensure};
 use iceoryx2::{
     port::update_connections::UpdateConnections,
     service::marker::{CustomHeaderMarker, CustomPayloadMarker},
@@ -60,11 +61,6 @@ pub struct Publisher {
 #[pymethods]
 impl Publisher {
     #[getter]
-    pub fn __payload_type_details(&self) -> Option<Py<PyAny>> {
-        self.payload_type_details.clone().value
-    }
-
-    #[getter]
     /// Returns the `UniquePublisherId` of the `Publisher`
     pub fn id(&self) -> UniquePublisherId {
         match &*self.value.lock() {
@@ -109,52 +105,6 @@ impl Publisher {
         }
     }
 
-    /// Loans/allocates a `SampleMutUninit` from the underlying data segment of the `Publisher`.
-    /// The user has to initialize the payload before it can be sent.
-    ///
-    /// On failure it returns `LoanError` describing the failure.
-    pub fn __loan_uninit(&self) -> PyResult<Public<SampleMutUninit>> {
-        self.__loan_slice_uninit(1)
-    }
-
-    /// Loans/allocates a `SampleMutUninit` from the underlying data segment of the `Publisher`.
-    /// The user has to initialize the payload before it can be sent.
-    /// Fails when it is called for data types which are not a slice.
-    ///
-    /// On failure it returns `LoanError` describing the failure.
-    pub fn __loan_slice_uninit(
-        &self,
-        number_of_elements: usize,
-    ) -> PyResult<Public<SampleMutUninit>> {
-        (match &*self.value.lock() {
-            PublisherType::Ipc(Some(v)) => {
-                let sample = unsafe {
-                    v.loan_custom_payload(number_of_elements)
-                        .map_err(|e| LoanError::new_err(format!("{e:?}")))?
-                };
-                Ok(SampleMutUninit {
-                    value: Parc::new(SampleMutUninitType::Ipc(Some(sample))),
-                    payload_type_details: self.payload_type_details.clone(),
-                    user_header_type_details: self.user_header_type_details.clone(),
-                })
-            }
-            PublisherType::Local(Some(v)) => {
-                let sample = unsafe {
-                    v.loan_custom_payload(number_of_elements)
-                        .map_err(|e| LoanError::new_err(format!("{e:?}")))?
-                };
-                Ok(SampleMutUninit {
-                    value: Parc::new(SampleMutUninitType::Local(Some(sample))),
-                    payload_type_details: self.payload_type_details.clone(),
-                    user_header_type_details: self.user_header_type_details.clone(),
-                })
-            }
-            _ => fatal_panic!(from "Publisher::loan_slice_uninit()",
-                "Accessing a deleted publisher."),
-        })
-        .map(Public)
-    }
-
     /// Explicitly updates the connection to every `Subscriber`. This is
     /// required to be called whenever a new `Subscriber` connected to
     /// the service. It is done implicitly whenever `SampleMut.send` or
@@ -187,6 +137,106 @@ impl Publisher {
             PublisherType::Local(v) => {
                 v.take();
             }
+        }
+    }
+
+    /// Loans/allocates a `SampleMutUninit` from the underlying data segment of the `Publisher`.
+    ///
+    /// The user has to initialize the payload before it can be sent. On failure it returns
+    /// `LoanError` describing the failure.
+    pub fn loan_uninit(&self) -> PyResult<Public<SampleMutUninit>> {
+        ensure(
+            self.payload_type_details.kind == PayloadKind::FixedSize,
+            "`loan_uninit()` is not available for `Slice` or `Flatbuffer` payloads",
+        )?;
+        self.loan_slice_uninit_unchecked(1).map(Public)
+    }
+
+    /// Loans/allocates a `SampleMutUninit` from the underlying data segment of the `Publisher`.
+    ///
+    /// The user has to initialize the payload before it can be sent.
+    /// Fails when it is called for data types which are not a slice.
+    /// On failure it returns `LoanError` describing the failure.
+    pub fn loan_slice_uninit(
+        &self,
+        number_of_elements: usize,
+    ) -> PyResult<Public<SampleMutUninit>> {
+        ensure(
+            self.payload_type_details.kind == PayloadKind::Slice,
+            "`loan_slice_uninit()` requires a `Slice` payload",
+        )?;
+        self.loan_slice_uninit_unchecked(number_of_elements)
+            .map(Public)
+    }
+
+    /// Loans/allocates a `SampleMutUninit` from the underlying data segment of the `Publisher`
+    /// with an integrated flatbuffer builder.
+    pub fn loan_flatbuffer(&self) -> PyResult<Public<SampleMutUninit>> {
+        ensure(
+            self.payload_type_details.kind == PayloadKind::Flatbuffer,
+            "`loan_flatbuffer()` requires a `Flatbuffer` payload",
+        )?;
+        // Loaning a slice of 1 byte is exactly what we need here. The flatbuffer builder is
+        // in python not zero-copy and completely resides on the heap since they do not have
+        // an API to provide a custom allocator.
+        //
+        // When the data production is finished the sample payload is grown/resized and the
+        // serialized flatbuffer content is copied into the sample.
+        self.loan_slice_uninit_unchecked(1).map(Public)
+    }
+
+    /// Sends a copy of the provided value.
+    pub fn send_copy(&self, t: &Bound<'_, PyAny>) -> PyResult<usize> {
+        ensure(
+            self.payload_type_details.kind != PayloadKind::Flatbuffer,
+            "`send_copy()` is not available for `Flatbuffer` payloads",
+        )?;
+        let sample = self.loan_uninit()?.0;
+        python_types::copy_value(
+            t,
+            self.payload_type_details.value.as_ref(),
+            sample.payload_ptr(),
+        )?;
+        sample.__assume_init().0.send()
+    }
+}
+
+// Helpers of the Python-side methods that are no longer part of the Python API.
+impl Publisher {
+    /// Loans/allocates a `SampleMutUninit` from the underlying data segment of the `Publisher`.
+    /// The user has to initialize the payload before it can be sent.
+    /// Fails when it is called for data types which are not a slice.
+    ///
+    /// On failure it returns `LoanError` describing the failure.
+    pub(crate) fn loan_slice_uninit_unchecked(
+        &self,
+        number_of_elements: usize,
+    ) -> PyResult<SampleMutUninit> {
+        match &*self.value.lock() {
+            PublisherType::Ipc(Some(v)) => {
+                let sample = unsafe {
+                    v.loan_custom_payload(number_of_elements)
+                        .map_err(|e| LoanError::new_err(format!("{e:?}")))?
+                };
+                Ok(SampleMutUninit {
+                    value: Parc::new(SampleMutUninitType::Ipc(Some(sample))),
+                    payload_type_details: self.payload_type_details.clone(),
+                    user_header_type_details: self.user_header_type_details.clone(),
+                })
+            }
+            PublisherType::Local(Some(v)) => {
+                let sample = unsafe {
+                    v.loan_custom_payload(number_of_elements)
+                        .map_err(|e| LoanError::new_err(format!("{e:?}")))?
+                };
+                Ok(SampleMutUninit {
+                    value: Parc::new(SampleMutUninitType::Local(Some(sample))),
+                    payload_type_details: self.payload_type_details.clone(),
+                    user_header_type_details: self.user_header_type_details.clone(),
+                })
+            }
+            _ => fatal_panic!(from "Publisher::loan_slice_uninit()",
+                "Accessing a deleted publisher."),
         }
     }
 }

@@ -11,6 +11,7 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
 use crate::public::Public;
+use crate::python_types;
 use iceoryx2::service::marker::CustomKeyMarker;
 use iceoryx2_log::fatal_panic;
 use pyo3::prelude::*;
@@ -38,11 +39,6 @@ pub struct Reader {
 #[pymethods]
 impl Reader {
     #[getter]
-    pub fn __key_type_details(&self) -> Option<Py<PyAny>> {
-        self.key_type_storage.clone().value
-    }
-
-    #[getter]
     /// Returns the `UniqueReaderId` of the `Reader`
     pub fn id(&self) -> UniqueReaderId {
         match &*self.value.lock() {
@@ -64,14 +60,49 @@ impl Reader {
         }
     }
 
+    /// Releases the `Reader`.
+    ///
+    /// After this call the `Reader` is no longer usable!
+    pub fn delete(&mut self) {
+        match *self.value.lock() {
+            ReaderType::Ipc(ref mut v) => {
+                v.take();
+            }
+            ReaderType::Local(ref mut v) => {
+                v.take();
+            }
+        }
+    }
+
+    /// Creates an `EntryHandle` for direct read access to the value.
+    ///
+    /// On failure it returns `EntryHandleError` describing the failure.
+    pub fn entry(
+        &self,
+        key: &Bound<'_, PyAny>,
+        value: &Bound<'_, PyAny>,
+    ) -> PyResult<Public<EntryHandle>> {
+        python_types::ensure_layout(key, self.key_type_storage.value.as_ref())?;
+        let mut entry_handle = self.entry_unchecked(
+            python_types::addressof(key)?,
+            python_types::fixed_size_type_detail(value)?,
+        )?;
+        entry_handle.set_value_type(value.clone().unbind());
+        entry_handle.set_value_ptr();
+        Ok(Public(entry_handle))
+    }
+}
+
+// Helpers of the Python-side methods that are no longer part of the Python API.
+impl Reader {
     /// Creates an EntryHandle for direct read access to the value. On failure
     /// it returns `EntryHandleError` describing the failure.
-    pub fn __entry(
+    pub(crate) fn entry_unchecked(
         &self,
         key: usize,
         value_type_details: TypeDetail,
-    ) -> PyResult<Public<EntryHandle>> {
-        (match &*self.value.lock() {
+    ) -> PyResult<EntryHandle> {
+        match &*self.value.lock() {
             ReaderType::Ipc(Some(v)) => {
                 let entry_handle = unsafe {
                     v.__internal_entry(key as *const u8, &value_type_details.0)
@@ -104,21 +135,6 @@ impl Reader {
             }
             _ => fatal_panic!(from "Reader::entry()",
                     "Accessing a deleted reader."),
-        })
-        .map(Public)
-    }
-
-    /// Releases the `Reader`.
-    ///
-    /// After this call the `Reader` is no longer usable!
-    pub fn delete(&mut self) {
-        match *self.value.lock() {
-            ReaderType::Ipc(ref mut v) => {
-                v.take();
-            }
-            ReaderType::Local(ref mut v) => {
-                v.take();
-            }
         }
     }
 }

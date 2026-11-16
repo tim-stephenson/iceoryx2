@@ -11,6 +11,7 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
 use crate::public::Public;
+use crate::python_types::{PayloadKind, ensure};
 use crate::{error::ClientCreateError, type_storage::TypeStorage};
 use iceoryx2::service::marker::{CustomHeaderMarker, CustomPayloadMarker};
 use pyo3::prelude::*;
@@ -119,11 +120,6 @@ impl PortFactoryClient {
 #[pymethods]
 impl PortFactoryClient {
     #[getter]
-    pub fn __request_payload_type_details(&self) -> Option<Py<PyAny>> {
-        self.request_payload_type_details.clone().value
-    }
-
-    #[getter]
     pub fn __request_header_type_details(&self) -> Option<Py<PyAny>> {
         self.request_header_type_details.clone().value
     }
@@ -202,43 +198,6 @@ impl PortFactoryClient {
         })
     }
 
-    /// Sets the maximum slice length that a user can allocate with
-    /// `Client.loan_slice` or `Client.loan_slice_uninit`.
-    pub fn __initial_max_slice_len(&self, value: usize) -> Public<Self> {
-        let _guard = self.factory.lock();
-        Public(match &self.value {
-            PortFactoryClientType::Ipc(v) => {
-                let this = unsafe { (*v.lock()).__internal_partial_clone() };
-                let this = this.initial_max_slice_len(value);
-                self.clone_ipc(this)
-            }
-            PortFactoryClientType::Local(v) => {
-                let this = unsafe { (*v.lock()).__internal_partial_clone() };
-                let this = this.initial_max_slice_len(value);
-                self.clone_local(this)
-            }
-        })
-    }
-
-    /// Defines the allocation strategy that is used when the provided
-    /// `PortFactoryClient.initial_max_slice_len` is exhausted. This happens when the user
-    /// acquires more than max slice len in `Client.loan_slice` or `Client.loan_slice_uninit`.
-    pub fn __allocation_strategy(&self, value: &AllocationStrategy) -> Public<Self> {
-        let _guard = self.factory.lock();
-        Public(match &self.value {
-            PortFactoryClientType::Ipc(v) => {
-                let this = unsafe { (*v.lock()).__internal_partial_clone() };
-                let this = this.allocation_strategy(value.clone().into());
-                self.clone_ipc(this)
-            }
-            PortFactoryClientType::Local(v) => {
-                let this = unsafe { (*v.lock()).__internal_partial_clone() };
-                let this = this.allocation_strategy(value.clone().into());
-                self.clone_local(this)
-            }
-        })
-    }
-
     /// Defines the maximal active requests the `Client` can send. Smallest possible value is ``1``.
     pub fn max_active_requests(&self, value: usize) -> Public<Self> {
         let _guard = self.factory.lock();
@@ -302,5 +261,73 @@ impl PortFactoryClient {
             }
         })
         .map(Public)
+    }
+
+    /// Sets the maximum slice length that a user can allocate.
+    pub fn initial_max_slice_len(&self, value: usize) -> PyResult<Public<Self>> {
+        ensure(
+            self.request_payload_type_details.kind == PayloadKind::Slice,
+            "`initial_max_slice_len()` requires a `Slice` payload",
+        )?;
+        Ok(Public(self.initial_max_slice_len_unchecked(value)))
+    }
+
+    /// Defines the allocation strategy that is used when the memory is exhausted.
+    pub fn allocation_strategy(&self, value: &AllocationStrategy) -> PyResult<Public<Self>> {
+        ensure(
+            self.request_payload_type_details.kind != PayloadKind::FixedSize,
+            "`allocation_strategy()` requires a `Slice` or `Flatbuffer` payload",
+        )?;
+        Ok(Public(self.allocation_strategy_unchecked(value)))
+    }
+
+    /// Sets the maximum initial reserved memory that the underlying allocator reserves for the
+    /// flatbuffer builder.
+    pub fn initial_reserved_memory(&self, value: usize) -> PyResult<Public<Self>> {
+        ensure(
+            self.request_payload_type_details.kind == PayloadKind::Flatbuffer,
+            "`initial_reserved_memory()` requires a `Flatbuffer` payload",
+        )?;
+        Ok(Public(self.initial_max_slice_len_unchecked(value)))
+    }
+}
+
+// Helpers of the Python-side methods that are no longer part of the Python API.
+impl PortFactoryClient {
+    /// Sets the maximum slice length that a user can allocate with
+    /// `Client.loan_slice` or `Client.loan_slice_uninit`.
+    pub(crate) fn initial_max_slice_len_unchecked(&self, value: usize) -> Self {
+        let _guard = self.factory.lock();
+        match &self.value {
+            PortFactoryClientType::Ipc(v) => {
+                let this = unsafe { (*v.lock()).__internal_partial_clone() };
+                let this = this.initial_max_slice_len(value);
+                self.clone_ipc(this)
+            }
+            PortFactoryClientType::Local(v) => {
+                let this = unsafe { (*v.lock()).__internal_partial_clone() };
+                let this = this.initial_max_slice_len(value);
+                self.clone_local(this)
+            }
+        }
+    }
+
+    /// Defines the allocation strategy that is used when the provided
+    /// `PortFactoryClient.initial_max_slice_len` is exhausted. This happens when the user
+    /// acquires more than max slice len in `Client.loan_slice` or `Client.loan_slice_uninit`.
+    pub(crate) fn allocation_strategy_unchecked(&self, value: &AllocationStrategy) -> Self {
+        let _guard = self.factory.lock();
+        match &self.value {
+            PortFactoryClientType::Ipc(v) => {
+                let this = unsafe { (*v.lock()).__internal_partial_clone() };
+                let this = this.allocation_strategy(value.clone().into());
+                self.clone_ipc(this)
+            }
+            PortFactoryClientType::Local(v) => {
+                let this = unsafe { (*v.lock()).__internal_partial_clone() };
+                let this = this.allocation_strategy(value.clone().into());
+                self.clone_local(this)
+            }
+        }
     }
 }
