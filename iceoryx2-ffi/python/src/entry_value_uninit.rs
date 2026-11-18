@@ -10,6 +10,7 @@
 //
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
+use crate::payload_access;
 use crate::python_types;
 use iceoryx2_log::fatal_panic;
 use pyo3::prelude::*;
@@ -33,21 +34,6 @@ pub struct EntryValueUninit {
 
 #[pymethods]
 impl EntryValueUninit {
-    #[getter]
-    pub fn __value_type(&self) -> Option<Py<PyAny>> {
-        self.value_type_storage.clone().value
-    }
-
-    pub fn __get_write_cell(&self) -> usize {
-        match &*self.value.lock() {
-            EntryValueUninitType::Ipc(Some(v)) => v.write_cell() as usize,
-            EntryValueUninitType::Local(Some(v)) => v.write_cell() as usize,
-            _ => {
-                fatal_panic!(from "EntryValueUninit::write()", "Accessing a deleted EntryValueUninit")
-            }
-        }
-    }
-
     /// Discards the `EntryValueUninit` and returns the original
     /// `EntryHandleMut`.
     pub fn discard(&mut self) -> EntryHandleMut {
@@ -90,6 +76,18 @@ impl EntryValueUninit {
         python_types::copy_bytes(value, self.__get_write_cell(), size)?;
         Ok(self.update_write_cell())
     }
+
+    /// Returns a `ctypes.POINTER` to the value of the blackboard entry.
+    ///
+    /// It can be used to update the value without copy. After writing,
+    /// assume_init_and_update() must be called.
+    pub fn value_mut(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        payload_access::value_pointer(
+            py,
+            self.__get_write_cell(),
+            self.value_type_storage.value.as_ref(),
+        )
+    }
 }
 
 // Helpers of the Python-side methods that are no longer part of the Python API.
@@ -113,6 +111,16 @@ impl EntryValueUninit {
                     value_type_storage: self.value_type_storage.clone(),
                     value_type_details: self.value_type_details.clone(),
                 }
+            }
+        }
+    }
+
+    pub fn __get_write_cell(&self) -> usize {
+        match &*self.value.lock() {
+            EntryValueUninitType::Ipc(Some(v)) => v.write_cell() as usize,
+            EntryValueUninitType::Local(Some(v)) => v.write_cell() as usize,
+            _ => {
+                fatal_panic!(from "EntryValueUninit::write()", "Accessing a deleted EntryValueUninit")
             }
         }
     }

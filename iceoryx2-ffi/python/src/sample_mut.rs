@@ -10,6 +10,7 @@
 //
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
+use crate::payload_access;
 use crate::python_types::{PayloadKind, ensure};
 use iceoryx2::service::marker::{CustomHeaderMarker, CustomPayloadMarker};
 use iceoryx2_log::fatal_panic;
@@ -57,26 +58,6 @@ pub struct SampleMut {
 
 #[pymethods]
 impl SampleMut {
-    #[getter]
-    pub fn __payload_type_details(&self) -> Option<Py<PyAny>> {
-        self.payload_type_details.clone().value
-    }
-
-    #[getter]
-    pub fn __user_header_type_details(&self) -> Option<Py<PyAny>> {
-        self.user_header_type_details.clone().value
-    }
-
-    #[getter]
-    pub fn __slice_len(&self) -> usize {
-        match &*self.value.lock() {
-            SampleMutType::Ipc(Some(v)) => v.payload().len(),
-            SampleMutType::Local(Some(v)) => v.payload().len(),
-            _ => fatal_panic!(from "Sample::header()",
-                "Accessing a released sample."),
-        }
-    }
-
     #[getter]
     /// Returns the `HeaderPublishSubscribe` of the `Sample`.
     pub fn header(&self) -> HeaderPublishSubscribe {
@@ -165,6 +146,60 @@ impl SampleMut {
         self.truncate_unchecked(number_of_elements);
         Ok(())
     }
+
+    /// Returns the payload.
+    ///
+    /// It is a `Slice` when the payload type is a `Slice`, otherwise a `ctypes.POINTER` to the
+    /// payload type.
+    pub fn payload(slf: &Bound<'_, Self>) -> PyResult<Py<PyAny>> {
+        let this = slf.borrow();
+        payload_access::payload(
+            slf.as_any(),
+            &this.payload_type_details,
+            this.payload_ptr(),
+            Some(this.__slice_len()),
+        )
+    }
+
+    /// Returns a `ctypes.POINTER` to the user header.
+    pub fn user_header(slf: &Bound<'_, Self>) -> PyResult<Py<PyAny>> {
+        let this = slf.borrow();
+        payload_access::user_header(
+            slf.as_any(),
+            &this.user_header_type_details,
+            this.user_header_ptr(),
+        )
+    }
+
+    /// Returns the serialized flatbuffer data as bytes.
+    ///
+    /// Only available when the payload type is a `Flatbuffer`.
+    pub fn payload_bytes(slf: &Bound<'_, Self>) -> PyResult<payload_access::ByteSlice> {
+        let this = slf.borrow();
+        let header = this.header();
+        payload_access::payload_bytes(
+            slf.as_any(),
+            &this.payload_type_details,
+            this.payload_ptr(),
+            header.number_of_elements(),
+            header.payload_offset(),
+        )
+    }
+
+    /// Returns the root of the flatbuffer.
+    ///
+    /// Only available when the payload type is a `Flatbuffer`.
+    pub fn payload_root(slf: &Bound<'_, Self>) -> PyResult<Py<PyAny>> {
+        let this = slf.borrow();
+        let header = this.header();
+        payload_access::payload_root(
+            slf.as_any(),
+            &this.payload_type_details,
+            this.payload_ptr(),
+            header.number_of_elements(),
+            header.payload_offset(),
+        )
+    }
 }
 
 // Helpers of the Python-side methods that are no longer part of the Python API.
@@ -174,6 +209,15 @@ impl SampleMut {
             SampleMutType::Ipc(Some(v)) => v.truncate(number_of_elements),
             SampleMutType::Local(Some(v)) => v.truncate(number_of_elements),
             _ => fatal_panic!(from "SampleMut::__truncate()",
+                "Accessing a released sample."),
+        }
+    }
+
+    pub fn __slice_len(&self) -> usize {
+        match &*self.value.lock() {
+            SampleMutType::Ipc(Some(v)) => v.payload().len(),
+            SampleMutType::Local(Some(v)) => v.payload().len(),
+            _ => fatal_panic!(from "Sample::header()",
                 "Accessing a released sample."),
         }
     }

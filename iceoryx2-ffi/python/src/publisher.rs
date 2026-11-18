@@ -215,6 +215,7 @@ impl Publisher {
                 };
                 Ok(SampleMutUninit {
                     value: Parc::new(SampleMutUninitType::Ipc(Some(sample))),
+                    builder: Default::default(),
                     payload_type_details: self.payload_type_details.clone(),
                     user_header_type_details: self.user_header_type_details.clone(),
                 })
@@ -226,6 +227,7 @@ impl Publisher {
                 };
                 Ok(SampleMutUninit {
                     value: Parc::new(SampleMutUninitType::Local(Some(sample))),
+                    builder: Default::default(),
                     payload_type_details: self.payload_type_details.clone(),
                     user_header_type_details: self.user_header_type_details.clone(),
                 })

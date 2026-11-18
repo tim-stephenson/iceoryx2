@@ -10,6 +10,7 @@
 //
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
+use crate::payload_access;
 use crate::python_types::{self, PayloadKind, ensure};
 use core::mem::MaybeUninit;
 
@@ -59,21 +60,159 @@ pub struct SampleMutUninit {
     pub(crate) value: Parc<SampleMutUninitType>,
     pub(crate) payload_type_details: TypeStorage,
     pub(crate) user_header_type_details: TypeStorage,
+    pub(crate) builder: payload_access::FlatbufferBuilderCell,
 }
 
 #[pymethods]
 impl SampleMutUninit {
     #[getter]
-    pub fn __payload_type_details(&self) -> Option<Py<PyAny>> {
-        self.payload_type_details.clone().value
+    /// Returns the `HeaderPublishSubscribe` of the `Sample`.
+    pub fn header(&self) -> HeaderPublishSubscribe {
+        match &*self.value.lock() {
+            SampleMutUninitType::Ipc(Some(v)) => HeaderPublishSubscribe(*v.header()),
+            SampleMutUninitType::Local(Some(v)) => HeaderPublishSubscribe(*v.header()),
+            _ => fatal_panic!(from "SampleMutUninit::header()",
+                "Accessing a released sample."),
+        }
     }
 
     #[getter]
-    pub fn __user_header_type_details(&self) -> Option<Py<PyAny>> {
-        self.user_header_type_details.clone().value
+    /// Returns the address of the user header as an `int`.
+    /// `SampleMutUninit.user_header` provides typed access.
+    pub fn user_header_ptr(&self) -> usize {
+        match &mut *self.value.lock() {
+            SampleMutUninitType::Ipc(Some(v)) => {
+                (v.user_header_mut() as *mut CustomHeaderMarker) as usize
+            }
+            SampleMutUninitType::Local(Some(v)) => {
+                (v.user_header_mut() as *mut CustomHeaderMarker) as usize
+            }
+            _ => fatal_panic!(from "SampleMutUninit::user_header_ptr()",
+                "Accessing a released sample."),
+        }
     }
 
     #[getter]
+    /// Returns the address of the payload as an `int`.
+    /// `SampleMutUninit.payload` provides typed access.
+    pub fn payload_ptr(&self) -> usize {
+        match &mut *self.value.lock() {
+            SampleMutUninitType::Ipc(Some(v)) => (v.payload_mut().as_mut_ptr()) as usize,
+            SampleMutUninitType::Local(Some(v)) => (v.payload_mut().as_mut_ptr()) as usize,
+            _ => fatal_panic!(from "SampleMutUninit::payload_ptr()",
+                "Accessing a released sample."),
+        }
+    }
+
+    /// Releases the `SampleMutUninit`.
+    ///
+    /// After this call the `SampleMutUninit` is no longer usable!
+    pub fn delete(&mut self) {
+        match &mut *self.value.lock() {
+            SampleMutUninitType::Ipc(v) => {
+                v.take();
+            }
+            SampleMutUninitType::Local(v) => {
+                v.take();
+            }
+        }
+    }
+
+    /// Shortens the payload to its first `number_of_elements` elements, so that only those are
+    /// sent.
+    ///
+    /// It has no effect when `number_of_elements` is not smaller than the current number of
+    /// elements. Fails when it is called for data types which are not a slice.
+    pub fn truncate(&self, number_of_elements: usize) -> PyResult<()> {
+        ensure(
+            self.payload_type_details.kind == PayloadKind::Slice,
+            "`truncate()` requires a `Slice` payload",
+        )?;
+        self.truncate_unchecked(number_of_elements);
+        Ok(())
+    }
+
+    /// Writes the provided value into the sample and returns the initialized `SampleMut`.
+    pub fn write_payload(&self, t: &Bound<'_, PyAny>) -> PyResult<SampleMut> {
+        ensure(
+            self.payload_type_details.kind != PayloadKind::Flatbuffer,
+            "`write_payload()` is not available for `Flatbuffer` payloads",
+        )?;
+        python_types::copy_value(
+            t,
+            self.payload_type_details.value.as_ref(),
+            self.payload_ptr(),
+        )?;
+        Ok(self.__assume_init())
+    }
+
+    /// Returns the payload.
+    ///
+    /// It is a `Slice` when the payload type is a `Slice`, otherwise a `ctypes.POINTER` to the
+    /// payload type.
+    pub fn payload(slf: &Bound<'_, Self>) -> PyResult<Py<PyAny>> {
+        let this = slf.borrow();
+        payload_access::payload(
+            slf.as_any(),
+            &this.payload_type_details,
+            this.payload_ptr(),
+            Some(this.__slice_len()),
+        )
+    }
+
+    /// Returns a `ctypes.POINTER` to the user header.
+    pub fn user_header(slf: &Bound<'_, Self>) -> PyResult<Py<PyAny>> {
+        let this = slf.borrow();
+        payload_access::user_header(
+            slf.as_any(),
+            &this.user_header_type_details,
+            this.user_header_ptr(),
+        )
+    }
+
+    /// Returns the flatbuffer builder to produce the data that shall be sent.
+    pub fn flatbuffer_builder(
+        &self,
+        py: Python<'_>,
+    ) -> PyResult<payload_access::FlatbufferBuilder> {
+        self.builder
+            .get_or_create(py, || self.__available_payload_memory())
+    }
+
+    /// Extracts the value of the uninitialized payload and labels the `SampleMutUninit` as initialized `SampleMut`.
+    ///
+    /// After this call the `SampleMutUninit` is no longer usable.
+    #[pyo3(signature = (root = None))]
+    pub fn assume_init(
+        &self,
+        py: Python<'_>,
+        root: Option<&Bound<'_, PyAny>>,
+    ) -> PyResult<SampleMut> {
+        payload_access::assume_init(
+            py,
+            &self.payload_type_details,
+            &self.builder,
+            || self.__available_payload_memory(),
+            root,
+            || self.__assume_init(),
+            |buffer_ptr, buffer_len, payload_offset| {
+                self.__assume_init_flatbuffer(buffer_ptr, buffer_len, payload_offset)
+            },
+        )
+    }
+}
+
+// Helpers of the Python-side methods that are no longer part of the Python API.
+impl SampleMutUninit {
+    pub(crate) fn truncate_unchecked(&self, number_of_elements: usize) {
+        match &mut *self.value.lock() {
+            SampleMutUninitType::Ipc(Some(v)) => v.truncate(number_of_elements),
+            SampleMutUninitType::Local(Some(v)) => v.truncate(number_of_elements),
+            _ => fatal_panic!(from "SampleMutUninit::__truncate()",
+                "Accessing a released sample."),
+        }
+    }
+
     pub fn __slice_len(&self) -> usize {
         match &*self.value.lock() {
             SampleMutUninitType::Ipc(Some(v)) => v.payload().len(),
@@ -83,7 +222,6 @@ impl SampleMutUninit {
         }
     }
 
-    #[getter]
     pub fn __available_payload_memory(&self) -> usize {
         match &*self.value.lock() {
             SampleMutUninitType::Ipc(Some(v)) => v.__internal_available_payload_memory(),
@@ -173,99 +311,6 @@ impl SampleMutUninit {
                     user_header_type_details: self.user_header_type_details.clone(),
                 }
             }
-        }
-    }
-
-    #[getter]
-    /// Returns the `HeaderPublishSubscribe` of the `Sample`.
-    pub fn header(&self) -> HeaderPublishSubscribe {
-        match &*self.value.lock() {
-            SampleMutUninitType::Ipc(Some(v)) => HeaderPublishSubscribe(*v.header()),
-            SampleMutUninitType::Local(Some(v)) => HeaderPublishSubscribe(*v.header()),
-            _ => fatal_panic!(from "SampleMutUninit::header()",
-                "Accessing a released sample."),
-        }
-    }
-
-    #[getter]
-    /// Returns the address of the user header as an `int`.
-    /// `SampleMutUninit.user_header` provides typed access.
-    pub fn user_header_ptr(&self) -> usize {
-        match &mut *self.value.lock() {
-            SampleMutUninitType::Ipc(Some(v)) => {
-                (v.user_header_mut() as *mut CustomHeaderMarker) as usize
-            }
-            SampleMutUninitType::Local(Some(v)) => {
-                (v.user_header_mut() as *mut CustomHeaderMarker) as usize
-            }
-            _ => fatal_panic!(from "SampleMutUninit::user_header_ptr()",
-                "Accessing a released sample."),
-        }
-    }
-
-    #[getter]
-    /// Returns the address of the payload as an `int`.
-    /// `SampleMutUninit.payload` provides typed access.
-    pub fn payload_ptr(&self) -> usize {
-        match &mut *self.value.lock() {
-            SampleMutUninitType::Ipc(Some(v)) => (v.payload_mut().as_mut_ptr()) as usize,
-            SampleMutUninitType::Local(Some(v)) => (v.payload_mut().as_mut_ptr()) as usize,
-            _ => fatal_panic!(from "SampleMutUninit::payload_ptr()",
-                "Accessing a released sample."),
-        }
-    }
-
-    /// Releases the `SampleMutUninit`.
-    ///
-    /// After this call the `SampleMutUninit` is no longer usable!
-    pub fn delete(&mut self) {
-        match &mut *self.value.lock() {
-            SampleMutUninitType::Ipc(v) => {
-                v.take();
-            }
-            SampleMutUninitType::Local(v) => {
-                v.take();
-            }
-        }
-    }
-
-    /// Shortens the payload to its first `number_of_elements` elements, so that only those are
-    /// sent.
-    ///
-    /// It has no effect when `number_of_elements` is not smaller than the current number of
-    /// elements. Fails when it is called for data types which are not a slice.
-    pub fn truncate(&self, number_of_elements: usize) -> PyResult<()> {
-        ensure(
-            self.payload_type_details.kind == PayloadKind::Slice,
-            "`truncate()` requires a `Slice` payload",
-        )?;
-        self.truncate_unchecked(number_of_elements);
-        Ok(())
-    }
-
-    /// Writes the provided value into the sample and returns the initialized `SampleMut`.
-    pub fn write_payload(&self, t: &Bound<'_, PyAny>) -> PyResult<SampleMut> {
-        ensure(
-            self.payload_type_details.kind != PayloadKind::Flatbuffer,
-            "`write_payload()` is not available for `Flatbuffer` payloads",
-        )?;
-        python_types::copy_value(
-            t,
-            self.payload_type_details.value.as_ref(),
-            self.payload_ptr(),
-        )?;
-        Ok(self.__assume_init())
-    }
-}
-
-// Helpers of the Python-side methods that are no longer part of the Python API.
-impl SampleMutUninit {
-    pub(crate) fn truncate_unchecked(&self, number_of_elements: usize) {
-        match &mut *self.value.lock() {
-            SampleMutUninitType::Ipc(Some(v)) => v.truncate(number_of_elements),
-            SampleMutUninitType::Local(Some(v)) => v.truncate(number_of_elements),
-            _ => fatal_panic!(from "SampleMutUninit::__truncate()",
-                "Accessing a released sample."),
         }
     }
 }

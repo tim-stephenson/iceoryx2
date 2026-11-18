@@ -63,6 +63,7 @@
 * [#2010](https://github.com/eclipse-iceoryx/iceoryx2/issues/2010) Receive bytes from a tunnel directly into loaned samples
 * [#2183](https://github.com/eclipse-iceoryx/iceoryx2/issues/2183) Implement the Python binding methods that register types, check the payload kind or copy values in Rust
 * [#2183](https://github.com/eclipse-iceoryx/iceoryx2/issues/2183) Show the type annotations of the methods implemented in Rust in the Python API documentation
+* [#2183](https://github.com/eclipse-iceoryx/iceoryx2/issues/2183) Implement the remaining Python binding methods in Rust, so that the type stubs cover the whole API
 
 ### Workflow
 

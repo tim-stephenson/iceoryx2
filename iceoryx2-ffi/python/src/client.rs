@@ -59,21 +59,6 @@ pub struct Client {
 #[pymethods]
 impl Client {
     #[getter]
-    pub fn __request_header_type_details(&self) -> Option<Py<PyAny>> {
-        self.request_header_type_details.clone().value
-    }
-
-    #[getter]
-    pub fn __response_payload_type_details(&self) -> Option<Py<PyAny>> {
-        self.response_payload_type_details.clone().value
-    }
-
-    #[getter]
-    pub fn __response_header_type_details(&self) -> Option<Py<PyAny>> {
-        self.response_header_type_details.clone().value
-    }
-
-    #[getter]
     /// Returns the `UniqueClientId` of the `Client`
     pub fn id(&self) -> UniqueClientId {
         match &*self.value.lock() {
@@ -221,6 +206,7 @@ impl Client {
                 response_payload_type_details: self.response_payload_type_details.clone(),
                 request_header_type_details: self.request_header_type_details.clone(),
                 response_header_type_details: self.response_header_type_details.clone(),
+                builder: Default::default(),
             }),
             ClientType::Local(Some(v)) => Ok(RequestMutUninit {
                 value: Parc::new(RequestMutUninitType::Local(Some(unsafe {
@@ -231,6 +217,7 @@ impl Client {
                 response_payload_type_details: self.response_payload_type_details.clone(),
                 request_header_type_details: self.request_header_type_details.clone(),
                 response_header_type_details: self.response_header_type_details.clone(),
+                builder: Default::default(),
             }),
             _ => {
                 fatal_panic!(from "Client::loan_slice_uninit()",

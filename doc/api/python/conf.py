@@ -45,7 +45,7 @@ nitpick_ignore_regex = [
     # type variables in the signatures of the extension modules
     (r'py:(class|obj)', r'iceoryx2\.\w+\.(K|V|T|ReqT|ResT)'),
     # flatbuffers does not publish an inventory to link against
-    (r'py:class', r'flatbuffers\.builder\.Builder'),
+    (r'py:class', r'flatbuffers(\.builder)?\.Builder'),
 ]
 
 # the navigation lists members without their class prefix
@@ -240,8 +240,31 @@ def stub_signatures(stub_directory):
 
     for stub in sorted(stub_directory.glob('*.pyi')):
         module = 'iceoryx2' if stub.stem == '__init__' else f'iceoryx2.{stub.stem}'
-        collect(module, ast.parse(stub.read_text()).body)
+        tree = ast.parse(stub.read_text())
+        collect(module, QualifyForeignNames(tree).visit(tree).body)
     return signatures
+
+
+class QualifyForeignNames(ast.NodeTransformer):
+    """Qualifies the names a stub imports from other libraries, e.g. `c_uint8` as `ctypes.c_uint8`.
+
+    The names of iceoryx2 resolve within the package and the names of `typing` are known to
+    Sphinx, all other names only resolve with their module.
+    """
+
+    def __init__(self, stub):
+        self.qualified = {
+            alias.asname or alias.name: f'{node.module}.{alias.name}'
+            for node in stub.body
+            if isinstance(node, ast.ImportFrom) and node.level == 0
+            and node.module.split('.')[0] not in ('iceoryx2', 'typing', '_typeshed')
+            for alias in node.names
+        }
+
+    def visit_Name(self, node):
+        if node.id not in self.qualified:
+            return node
+        return ast.copy_location(ast.parse(self.qualified[node.id], mode='eval').body, node)
 
 
 def signature_of(function):

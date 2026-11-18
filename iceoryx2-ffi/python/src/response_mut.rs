@@ -10,6 +10,7 @@
 //
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
+use crate::payload_access;
 use iceoryx2::service::marker::{CustomHeaderMarker, CustomPayloadMarker};
 use iceoryx2_log::fatal_panic;
 use pyo3::prelude::*;
@@ -43,26 +44,6 @@ pub struct ResponseMut {
 
 #[pymethods]
 impl ResponseMut {
-    #[getter]
-    pub fn __response_payload_type_details(&self) -> Option<Py<PyAny>> {
-        self.response_payload_type_details.clone().value
-    }
-
-    #[getter]
-    pub fn __response_header_type_details(&self) -> Option<Py<PyAny>> {
-        self.response_header_type_details.clone().value
-    }
-
-    #[getter]
-    pub fn __slice_len(&self) -> usize {
-        match &*self.value.lock() {
-            ResponseMutType::Ipc(Some(v)) => v.payload().len(),
-            ResponseMutType::Local(Some(v)) => v.payload().len(),
-            _ => fatal_panic!(from "RequestMut::__slice_len()",
-                "Accessing a released response mut."),
-        }
-    }
-
     #[getter]
     /// Returns a reference to the `ResponseHeader`.
     pub fn header(&self) -> ResponseHeader {
@@ -132,6 +113,72 @@ impl ResponseMut {
                     .send()
                     .map_err(|e| SendError::new_err(format!("{e:?}")))?)
             }
+        }
+    }
+
+    /// Returns the payload of the response.
+    ///
+    /// It is a `Slice` when the payload type is a `Slice`, otherwise a `ctypes.POINTER` to the
+    /// payload type.
+    pub fn payload(slf: &Bound<'_, Self>) -> PyResult<Py<PyAny>> {
+        let this = slf.borrow();
+        payload_access::payload(
+            slf.as_any(),
+            &this.response_payload_type_details,
+            this.payload_ptr(),
+            Some(this.__slice_len()),
+        )
+    }
+
+    /// Returns a `ctypes.POINTER` to the response header.
+    pub fn user_header(slf: &Bound<'_, Self>) -> PyResult<Py<PyAny>> {
+        let this = slf.borrow();
+        payload_access::user_header(
+            slf.as_any(),
+            &this.response_header_type_details,
+            this.user_header_ptr(),
+        )
+    }
+
+    /// Returns the serialized flatbuffer data as bytes.
+    ///
+    /// Only available when the payload type is a `Flatbuffer`.
+    pub fn payload_bytes(slf: &Bound<'_, Self>) -> PyResult<payload_access::ByteSlice> {
+        let this = slf.borrow();
+        let header = this.header();
+        payload_access::payload_bytes(
+            slf.as_any(),
+            &this.response_payload_type_details,
+            this.payload_ptr(),
+            header.number_of_elements(),
+            header.payload_offset(),
+        )
+    }
+
+    /// Returns the root of the flatbuffer.
+    ///
+    /// Only available when the payload type is a `Flatbuffer`.
+    pub fn payload_root(slf: &Bound<'_, Self>) -> PyResult<Py<PyAny>> {
+        let this = slf.borrow();
+        let header = this.header();
+        payload_access::payload_root(
+            slf.as_any(),
+            &this.response_payload_type_details,
+            this.payload_ptr(),
+            header.number_of_elements(),
+            header.payload_offset(),
+        )
+    }
+}
+
+// Helpers of the Python-side methods that are no longer part of the Python API.
+impl ResponseMut {
+    pub fn __slice_len(&self) -> usize {
+        match &*self.value.lock() {
+            ResponseMutType::Ipc(Some(v)) => v.payload().len(),
+            ResponseMutType::Local(Some(v)) => v.payload().len(),
+            _ => fatal_panic!(from "RequestMut::__slice_len()",
+                "Accessing a released response mut."),
         }
     }
 }

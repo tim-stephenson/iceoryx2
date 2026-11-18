@@ -10,6 +10,7 @@
 //
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
+use crate::payload_access;
 use crate::python_types::{self, PayloadKind, ensure};
 use iceoryx2::service::marker::{CustomHeaderMarker, CustomPayloadMarker};
 use iceoryx2_log::fatal_panic;
@@ -57,31 +58,6 @@ pub struct ActiveRequest {
 
 #[pymethods]
 impl ActiveRequest {
-    #[getter]
-    pub fn __request_payload_type_details(&self) -> Option<Py<PyAny>> {
-        self.request_payload_type_details.clone().value
-    }
-
-    #[getter]
-    pub fn __request_header_type_details(&self) -> Option<Py<PyAny>> {
-        self.request_header_type_details.clone().value
-    }
-
-    #[getter]
-    pub fn __response_header_type_details(&self) -> Option<Py<PyAny>> {
-        self.response_header_type_details.clone().value
-    }
-
-    #[getter]
-    pub fn __slice_len(&self) -> usize {
-        match &*self.value.lock() {
-            ActiveRequestType::Ipc(Some(v)) => v.payload().len(),
-            ActiveRequestType::Local(Some(v)) => v.payload().len(),
-            _ => fatal_panic!(from "RequestMutUninit::__slice_len()",
-                "Accessing a released request."),
-        }
-    }
-
     #[getter]
     /// Returns `True` until the `PendingResponse` goes out of scope on the `Client`'s side
     /// indicating that the `Client` no longer receives the `ResponseMut`.
@@ -227,6 +203,60 @@ impl ActiveRequest {
         )?;
         uninit.__assume_init().send()
     }
+
+    /// Returns the payload of the request.
+    ///
+    /// It is a `Slice` when the payload type is a `Slice`, otherwise a `ctypes.POINTER` to the
+    /// payload type.
+    pub fn payload(slf: &Bound<'_, Self>) -> PyResult<Py<PyAny>> {
+        let this = slf.borrow();
+        payload_access::payload(
+            slf.as_any(),
+            &this.request_payload_type_details,
+            this.payload_ptr(),
+            Some(this.__slice_len()),
+        )
+    }
+
+    /// Returns a `ctypes.POINTER` to the request header.
+    pub fn user_header(slf: &Bound<'_, Self>) -> PyResult<Py<PyAny>> {
+        let this = slf.borrow();
+        payload_access::user_header(
+            slf.as_any(),
+            &this.request_header_type_details,
+            this.user_header_ptr(),
+        )
+    }
+
+    /// Returns the serialized flatbuffer data as bytes.
+    ///
+    /// Only available when the payload type is a `Flatbuffer`.
+    pub fn payload_bytes(slf: &Bound<'_, Self>) -> PyResult<payload_access::ByteSlice> {
+        let this = slf.borrow();
+        let header = this.header();
+        payload_access::payload_bytes(
+            slf.as_any(),
+            &this.request_payload_type_details,
+            this.payload_ptr(),
+            header.number_of_elements(),
+            header.payload_offset(),
+        )
+    }
+
+    /// Returns the root of the flatbuffer.
+    ///
+    /// Only available when the payload type is a `Flatbuffer`.
+    pub fn payload_root(slf: &Bound<'_, Self>) -> PyResult<Py<PyAny>> {
+        let this = slf.borrow();
+        let header = this.header();
+        payload_access::payload_root(
+            slf.as_any(),
+            &this.request_payload_type_details,
+            this.payload_ptr(),
+            header.number_of_elements(),
+            header.payload_offset(),
+        )
+    }
 }
 
 // Helpers of the Python-side methods that are no longer part of the Python API.
@@ -247,6 +277,7 @@ impl ActiveRequest {
                 }))),
                 response_header_type_details: self.response_header_type_details.clone(),
                 response_payload_type_details: self.response_payload_type_details.clone(),
+                builder: Default::default(),
             }),
             ActiveRequestType::Local(Some(v)) => Ok(ResponseMutUninit {
                 value: Parc::new(ResponseMutUninitType::Local(Some(unsafe {
@@ -255,9 +286,19 @@ impl ActiveRequest {
                 }))),
                 response_header_type_details: self.response_header_type_details.clone(),
                 response_payload_type_details: self.response_payload_type_details.clone(),
+                builder: Default::default(),
             }),
             _ => fatal_panic!(from "ActiveRequest::loan_slice_uninit()",
                     "Accessing a released active request"),
+        }
+    }
+
+    pub fn __slice_len(&self) -> usize {
+        match &*self.value.lock() {
+            ActiveRequestType::Ipc(Some(v)) => v.payload().len(),
+            ActiveRequestType::Local(Some(v)) => v.payload().len(),
+            _ => fatal_panic!(from "RequestMutUninit::__slice_len()",
+                "Accessing a released request."),
         }
     }
 }

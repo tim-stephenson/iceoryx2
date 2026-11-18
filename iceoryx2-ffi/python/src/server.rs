@@ -57,26 +57,6 @@ pub struct Server {
 #[pymethods]
 impl Server {
     #[getter]
-    pub fn __request_payload_type_details(&self) -> Option<Py<PyAny>> {
-        self.request_payload_type_details.clone().value
-    }
-
-    #[getter]
-    pub fn __request_header_type_details(&self) -> Option<Py<PyAny>> {
-        self.request_header_type_details.clone().value
-    }
-
-    #[getter]
-    pub fn __response_payload_type_details(&self) -> Option<Py<PyAny>> {
-        self.response_payload_type_details.clone().value
-    }
-
-    #[getter]
-    pub fn __response_header_type_details(&self) -> Option<Py<PyAny>> {
-        self.response_header_type_details.clone().value
-    }
-
-    #[getter]
     /// Returns the `UniqueServerId` of the `Server`
     pub fn id(&self) -> UniqueServerId {
         match &*self.value.lock() {
@@ -109,17 +89,6 @@ impl Server {
                 .has_requests()
                 .map_err(|e| ConnectionFailure::new_err(format!("{e:?}")))?),
             _ => fatal_panic!(from "Server::has_requests()",
-                "Accessing a released server."),
-        }
-    }
-
-    #[getter]
-    /// Returns the maximum initial slice length configured for this `Server`.
-    pub fn __initial_max_slice_len(&self) -> usize {
-        match &*self.value.lock() {
-            ServerType::Ipc(Some(v)) => v.initial_max_slice_len(),
-            ServerType::Local(Some(v)) => v.initial_max_slice_len(),
-            _ => fatal_panic!(from "Server::initial_max_slice_len()",
                 "Accessing a released server."),
         }
     }

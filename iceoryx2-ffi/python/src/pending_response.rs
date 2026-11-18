@@ -10,6 +10,7 @@
 //
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
+use crate::payload_access;
 use iceoryx2::service::marker::{CustomHeaderMarker, CustomPayloadMarker};
 use iceoryx2_log::fatal_panic;
 use pyo3::prelude::*;
@@ -57,26 +58,6 @@ pub struct PendingResponse {
 
 #[pymethods]
 impl PendingResponse {
-    #[getter]
-    pub fn __request_payload_type_details(&self) -> Option<Py<PyAny>> {
-        self.request_payload_type_details.clone().value
-    }
-
-    #[getter]
-    pub fn __request_header_type_details(&self) -> Option<Py<PyAny>> {
-        self.request_header_type_details.clone().value
-    }
-
-    #[getter]
-    pub fn __response_payload_type_details(&self) -> Option<Py<PyAny>> {
-        self.response_payload_type_details.clone().value
-    }
-
-    #[getter]
-    pub fn __response_header_type_details(&self) -> Option<Py<PyAny>> {
-        self.response_header_type_details.clone().value
-    }
-
     /// Returns `True` until the `ActiveRequest` goes out of scope on the `Server`'s side
     /// indicating that the `Server` will no longer send a `Response`.
     /// It also returns `False` when there are no `Server`.
@@ -207,5 +188,59 @@ impl PendingResponse {
             _ => fatal_panic!(from "PendingResponse::is_connected()",
                     "Accessing a released pending response."),
         }
+    }
+
+    /// Returns the payload of the request.
+    ///
+    /// It is a `Slice` when the payload type is a `Slice`, otherwise a `ctypes.POINTER` to the
+    /// payload type.
+    pub fn payload(slf: &Bound<'_, Self>) -> PyResult<Py<PyAny>> {
+        let this = slf.borrow();
+        payload_access::payload(
+            slf.as_any(),
+            &this.request_payload_type_details,
+            this.payload_ptr(),
+            None,
+        )
+    }
+
+    /// Returns a `ctypes.POINTER` to the request header.
+    pub fn user_header(slf: &Bound<'_, Self>) -> PyResult<Py<PyAny>> {
+        let this = slf.borrow();
+        payload_access::user_header(
+            slf.as_any(),
+            &this.request_header_type_details,
+            this.user_header_ptr(),
+        )
+    }
+
+    /// Returns the serialized flatbuffer data as bytes.
+    ///
+    /// Only available when the payload type is a `Flatbuffer`.
+    pub fn payload_bytes(slf: &Bound<'_, Self>) -> PyResult<payload_access::ByteSlice> {
+        let this = slf.borrow();
+        let header = this.header();
+        payload_access::payload_bytes(
+            slf.as_any(),
+            &this.request_payload_type_details,
+            this.payload_ptr(),
+            header.number_of_elements(),
+            header.payload_offset(),
+        )
+    }
+
+    /// Returns the root of the flatbuffer.
+    ///
+    /// Only available when the payload type is a `Flatbuffer`.
+    pub fn payload_root(slf: &Bound<'_, Self>) -> PyResult<Py<PyAny>> {
+        let this = slf.borrow();
+        let header = this.header();
+        payload_access::payload_root(
+            slf.as_any(),
+            &this.request_payload_type_details,
+            this.payload_ptr(),
+            header.number_of_elements(),
+            header.payload_offset(),
+        )
     }
 }

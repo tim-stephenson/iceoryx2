@@ -15,7 +15,5 @@
 from ._iceoryx2 import *
 from .blackboard_extensions import *
 from .flatbuffer import Flatbuffer
-from .publish_subscribe_extensions import *
-from .request_response_extensions import *
 from .slice import Slice
 from .type_name import get_type_name

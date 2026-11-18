@@ -35,3 +35,5 @@ features = ["abi3-py38", "abi3t-py315"]
 
 [features]
 log = ["iceoryx2/log"]
+# annotates the return types of the Python objects created in Rust in the type stubs
+experimental-inspect = ["pyo3/experimental-inspect"]

@@ -10,6 +10,7 @@
 //
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
+use crate::payload_access;
 use iceoryx2::prelude::{CallbackProgression, PortFactory};
 use iceoryx2::service::marker::CustomKeyMarker;
 use iceoryx2_log::fatal_panic;
@@ -70,11 +71,6 @@ impl PortFactoryBlackboard {
 
 #[pymethods]
 impl PortFactoryBlackboard {
-    #[getter]
-    pub fn __key_type_details(&self) -> Option<Py<PyAny>> {
-        self.key_type_storage.clone().value
-    }
-
     #[getter]
     /// Returns the dynamic configuration, including the current port counts.
     pub fn dynamic_config(&self) -> DynamicConfigBlackboard {
@@ -242,6 +238,21 @@ impl PortFactoryBlackboard {
         }
     }
 
+    /// Returns a list containing copies of the blackboard keys as bytes.
+    ///
+    /// The keys are wrapped in a `BlackboardKey`. Use decode_as() to
+    /// reinterpret the raw bytes as a ctypes type.
+    pub fn list_keys(&self, py: Python<'_>) -> PyResult<payload_access::BlackboardKeys> {
+        payload_access::blackboard_keys(
+            py,
+            &self.__list_keys(),
+            self.key_type_storage.value.as_ref(),
+        )
+    }
+}
+
+// Helpers of the Python-side methods that are no longer part of the Python API.
+impl PortFactoryBlackboard {
     pub fn __list_keys(&self) -> Vec<usize> {
         let mut keys = Vec::new();
         match &*self.value.lock() {

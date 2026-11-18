@@ -119,21 +119,6 @@ impl PortFactoryServer {
 
 #[pymethods]
 impl PortFactoryServer {
-    #[getter]
-    pub fn __request_payload_type_details(&self) -> Option<Py<PyAny>> {
-        self.request_payload_type_details.clone().value
-    }
-
-    #[getter]
-    pub fn __request_header_type_details(&self) -> Option<Py<PyAny>> {
-        self.request_header_type_details.clone().value
-    }
-
-    #[getter]
-    pub fn __response_header_type_details(&self) -> Option<Py<PyAny>> {
-        self.response_header_type_details.clone().value
-    }
-
     /// Reduces the preallocated `ResponseMut` count.
     /// The return value is clamped between ``1`` and the worst case
     /// preallocated `ResponseMut` count required

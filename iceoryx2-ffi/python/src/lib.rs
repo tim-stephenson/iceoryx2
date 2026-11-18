@@ -50,6 +50,7 @@ pub mod node_state;
 pub mod notifier;
 pub mod parc;
 pub mod path;
+pub mod payload_access;
 pub mod pending_response;
 pub mod port_factory_blackboard;
 pub mod port_factory_client;

@@ -10,6 +10,7 @@
 //
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
+use crate::payload_access;
 use pyo3::prelude::*;
 
 use crate::event_id::EventId;
@@ -32,44 +33,8 @@ pub struct EntryHandle {
 
 #[pymethods]
 impl EntryHandle {
-    #[getter]
-    pub fn __value_type(&self) -> Option<Py<PyAny>> {
-        self.value_type_storage.clone().value
-    }
-
     // Stores a copy of the blackboard value into `value_ptr` and returns a tuple containing the
     // pointer as usize and the value's generation counter.
-    pub fn __get(&self) -> (usize, u64) {
-        let value_size = self.value_type_details.0.size();
-        let value_alignment = self.value_type_details.0.alignment();
-        let value_buffer = (self.value_ptr.lock()).value_buffer;
-        let mut generation_counter: u64 = 0;
-        let generation_counter_ptr: *mut u64 = &mut generation_counter;
-        match &*self.value.lock() {
-            EntryHandleType::Ipc(v) => {
-                unsafe {
-                    v.get(
-                        value_buffer,
-                        value_size,
-                        value_alignment,
-                        generation_counter_ptr,
-                    )
-                };
-                (value_buffer as usize, generation_counter)
-            }
-            EntryHandleType::Local(v) => {
-                unsafe {
-                    v.get(
-                        value_buffer,
-                        value_size,
-                        value_alignment,
-                        generation_counter_ptr,
-                    )
-                };
-                (value_buffer as usize, generation_counter)
-            }
-        }
-    }
 
     /// Returns an ID corresponding to the entry which can be used in an event based communication
     /// setup.
@@ -85,6 +50,19 @@ impl EntryHandle {
     pub fn is_up_to_date(&self, value: &Bound<'_, PyAny>) -> PyResult<bool> {
         let generation_counter: u64 = value.getattr("_generation_counter")?.extract()?;
         Ok(self.is_up_to_date_unchecked(generation_counter))
+    }
+
+    /// Returns a copy of the value as bytes wrapped in a `BlackboardValue`.
+    ///
+    /// Use decode_as() to reinterpret the raw bytes as a ctypes type.
+    pub fn get(&self, py: Python<'_>) -> PyResult<payload_access::BlackboardValue> {
+        let (value_ptr, generation_counter) = self.__get();
+        payload_access::blackboard_value(
+            py,
+            value_ptr,
+            self.value_type_storage.value.as_ref(),
+            generation_counter,
+        )
     }
 }
 
@@ -114,6 +92,38 @@ impl EntryHandle {
         match &*self.value.lock() {
             EntryHandleType::Ipc(v) => v.is_up_to_date(generation_counter),
             EntryHandleType::Local(v) => v.is_up_to_date(generation_counter),
+        }
+    }
+
+    pub fn __get(&self) -> (usize, u64) {
+        let value_size = self.value_type_details.0.size();
+        let value_alignment = self.value_type_details.0.alignment();
+        let value_buffer = (self.value_ptr.lock()).value_buffer;
+        let mut generation_counter: u64 = 0;
+        let generation_counter_ptr: *mut u64 = &mut generation_counter;
+        match &*self.value.lock() {
+            EntryHandleType::Ipc(v) => {
+                unsafe {
+                    v.get(
+                        value_buffer,
+                        value_size,
+                        value_alignment,
+                        generation_counter_ptr,
+                    )
+                };
+                (value_buffer as usize, generation_counter)
+            }
+            EntryHandleType::Local(v) => {
+                unsafe {
+                    v.get(
+                        value_buffer,
+                        value_size,
+                        value_alignment,
+                        generation_counter_ptr,
+                    )
+                };
+                (value_buffer as usize, generation_counter)
+            }
         }
     }
 }
