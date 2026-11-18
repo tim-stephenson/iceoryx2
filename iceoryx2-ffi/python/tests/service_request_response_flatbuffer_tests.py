@@ -930,3 +930,111 @@ def test_builder_is_cleaned_up_when_response_is_initialized(
         response_data = create_unbounded_data(builder, 21312)
         response = response.assume_init(response_data)
         assert len(builder.Bytes) <= 256
+
+
+@pytest.mark.parametrize("service_type", service_types)
+def test_flatbuffer_type_forbids_use_of_non_flatbuffer_api(
+    service_type: iox2.ServiceType,
+) -> None:
+    request_schema_file_path = get_schema_file(schema_bounded)
+    response_schema_file_path = get_schema_file(schema_unbounded)
+    config = iox2.testing.generate_isolated_config()
+    node = iox2.NodeBuilder.new().config(config).create(service_type)
+    service_name = iox2.testing.generate_service_name()
+
+    sut = (
+        node.service_builder(service_name)
+        .request_response(
+            iox2.Flatbuffer[BoundedData],
+            iox2.Flatbuffer[UnboundedData],
+        )
+        .request_flatbuffer_schema_path(request_schema_file_path)
+        .response_flatbuffer_schema_path(response_schema_file_path)
+        .create()
+    )
+
+    with pytest.raises(AssertionError, match="Slice"):
+        sut.client_builder().initial_max_slice_len(8)
+
+    with pytest.raises(AssertionError, match="Slice"):
+        sut.server_builder().initial_max_slice_len(8)
+
+    server = sut.server_builder().initial_reserved_memory(4096).create()
+    client = sut.client_builder().initial_reserved_memory(4096).create()
+
+    with pytest.raises(AssertionError, match="Flatbuffer"):
+        client.loan_uninit()
+
+    with pytest.raises(AssertionError, match="Slice"):
+        client.loan_slice_uninit(1)
+
+    with pytest.raises(AssertionError, match="Flatbuffer"):
+        client.send_copy(ctypes.c_uint8(0))
+
+    request = client.loan_flatbuffer()
+
+    with pytest.raises(AssertionError, match="Flatbuffer"):
+        request.write_payload(ctypes.c_uint8(0))
+
+    request_data = create_bounded_data(request.flatbuffer_builder(), 123)
+    request.assume_init(request_data).send()
+
+    active_request = server.receive()
+    assert active_request is not None
+
+    with pytest.raises(AssertionError, match="Flatbuffer"):
+        active_request.loan_uninit()
+
+    with pytest.raises(AssertionError, match="Slice"):
+        active_request.loan_slice_uninit(1)
+
+    with pytest.raises(AssertionError, match="Flatbuffer"):
+        active_request.send_copy(ctypes.c_uint8(0))
+
+    response = active_request.loan_flatbuffer()
+
+    with pytest.raises(AssertionError, match="Flatbuffer"):
+        response.write_payload(ctypes.c_uint8(0))
+
+
+@pytest.mark.parametrize("service_type", service_types)
+def test_payload_api_checks_the_payload_of_its_own_side(
+    service_type: iox2.ServiceType,
+) -> None:
+    response_schema_file_path = get_schema_file(schema_unbounded)
+    config = iox2.testing.generate_isolated_config()
+    node = iox2.NodeBuilder.new().config(config).create(service_type)
+    service_name = iox2.testing.generate_service_name()
+
+    sut = (
+        node.service_builder(service_name)
+        .request_response(ctypes.c_uint64, iox2.Flatbuffer[UnboundedData])
+        .response_flatbuffer_schema_path(response_schema_file_path)
+        .create()
+    )
+
+    with pytest.raises(AssertionError, match="Flatbuffer"):
+        sut.client_builder().initial_reserved_memory(4096)
+
+    server = sut.server_builder().initial_reserved_memory(4096).create()
+    client = sut.client_builder().create()
+
+    with pytest.raises(AssertionError, match="Flatbuffer"):
+        client.loan_flatbuffer()
+
+    pending_response = client.send_copy(ctypes.c_uint64(123))
+
+    active_request = server.receive()
+    assert active_request is not None
+    assert active_request.payload().contents.value == 123
+
+    with pytest.raises(AssertionError, match="Flatbuffer"):
+        active_request.loan_uninit()
+
+    response = active_request.loan_flatbuffer()
+    response_data = create_unbounded_data(response.flatbuffer_builder(), 321)
+    response.assume_init(response_data).send()
+
+    response_received = pending_response.receive()
+    assert response_received is not None
+    assert response_received.payload_root().Entries(0).Data1() == 321

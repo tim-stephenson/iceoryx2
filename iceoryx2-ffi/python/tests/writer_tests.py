@@ -213,3 +213,66 @@ def test_deleting_writer_removes_it_from_the_service(
         sut = service.writer_builder().create()
     except iox2.WriterCreateError:
         assert False
+
+
+LAYOUT_MISMATCHES = [
+    (c_uint8(1), "size"),
+    ((c_uint8 * 8)(), "alignment"),
+]
+
+
+@pytest.mark.parametrize("service_type", service_types)
+@pytest.mark.parametrize("key, reason", LAYOUT_MISMATCHES)
+def test_handle_cannot_be_acquired_when_key_layout_does_not_match_key_type(
+    service_type: iox2.ServiceType,
+    key: c_uint8,
+    reason: str,
+) -> None:
+    config = iox2.testing.generate_isolated_config()
+    node = iox2.NodeBuilder.new().config(config).create(service_type)
+    service_name = iox2.testing.generate_service_name()
+    service = (
+        node.service_builder(service_name)
+        .blackboard_creator(c_uint64)
+        .add(c_uint64(0), c_uint64(0))
+        .create()
+    )
+
+    writer = service.writer_builder().create()
+
+    with pytest.raises(AssertionError, match=reason):
+        writer.entry(key, c_uint64)
+
+
+@pytest.mark.parametrize("service_type", service_types)
+@pytest.mark.parametrize("value, reason", LAYOUT_MISMATCHES)
+def test_update_with_copy_fails_when_value_layout_does_not_match_value_type(
+    service_type: iox2.ServiceType,
+    value: c_uint8,
+    reason: str,
+) -> None:
+    config = iox2.testing.generate_isolated_config()
+    node = iox2.NodeBuilder.new().config(config).create(service_type)
+    service_name = iox2.testing.generate_service_name()
+    key = c_uint64(0)
+    service = (
+        node.service_builder(service_name)
+        .blackboard_creator(c_uint64)
+        .add(key, c_uint64(42))
+        .create()
+    )
+
+    writer = service.writer_builder().create()
+    reader = service.reader_builder().create()
+    entry_handle_mut = writer.entry(key, c_uint64)
+
+    with pytest.raises(AssertionError, match=reason):
+        entry_handle_mut.update_with_copy(value)
+
+    entry_value_uninit = entry_handle_mut.loan_uninit()
+
+    with pytest.raises(AssertionError, match=reason):
+        entry_value_uninit.update_with_copy(value)
+
+    entry_handle = reader.entry(key, c_uint64)
+    assert entry_handle.get().decode_as(c_uint64).value == 42

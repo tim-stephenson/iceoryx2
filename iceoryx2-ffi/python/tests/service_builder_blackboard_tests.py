@@ -696,3 +696,23 @@ def test_set_max_readers_to_zero_adjusts_it_to_one(
     )
 
     assert service.static_config.max_readers == 1
+
+
+@pytest.mark.parametrize("service_type", service_types)
+@pytest.mark.parametrize(
+    "key, reason",
+    [(ctypes.c_uint8(1), "size"), ((ctypes.c_uint8 * 8)(), "alignment")],
+)
+def test_add_fails_when_key_layout_does_not_match_key_type(
+    service_type: iox2.ServiceType,
+    key: ctypes.c_uint8,
+    reason: str,
+) -> None:
+    config = iox2.testing.generate_isolated_config()
+    node = iox2.NodeBuilder.new().config(config).create(service_type)
+    service_name = iox2.testing.generate_service_name()
+
+    creator = node.service_builder(service_name).blackboard_creator(ctypes.c_uint64)
+
+    with pytest.raises(AssertionError, match=reason):
+        creator.add(key, ctypes.c_uint64(0))

@@ -557,3 +557,86 @@ def test_port_names_can_be_set(
 
     assert publisher.name == publisher_name
     assert subscriber.name == subscriber_name
+
+
+@pytest.mark.parametrize("service_type", service_types)
+@pytest.mark.parametrize("payload_type", [Payload, iox2.Slice[ctypes.c_uint8]])
+def test_non_flatbuffer_type_forbids_use_of_flatbuffer_api(
+    service_type: iox2.ServiceType,
+    payload_type: type,
+) -> None:
+    config = iox2.testing.generate_isolated_config()
+    node = iox2.NodeBuilder.new().config(config).create(service_type)
+
+    service_name = iox2.testing.generate_service_name()
+    service_builder = node.service_builder(service_name).publish_subscribe(payload_type)
+
+    with pytest.raises(AssertionError, match="Flatbuffer"):
+        service_builder.flatbuffer_schema_path(iox2.FilePath.new("schema.bfbs"))
+
+    service = service_builder.create()
+
+    with pytest.raises(AssertionError, match="Flatbuffer"):
+        service.publisher_builder().initial_reserved_memory(1024)
+
+    publisher = service.publisher_builder().create()
+
+    with pytest.raises(AssertionError, match="Flatbuffer"):
+        publisher.loan_flatbuffer()
+
+
+@pytest.mark.parametrize("service_type", service_types)
+@pytest.mark.parametrize(
+    "value, reason",
+    [
+        (Payload(data=1), "size"),
+        ((ctypes.c_uint8 * ctypes.sizeof(LargePayload))(), "alignment"),
+    ],
+)
+def test_send_copy_fails_when_value_layout_does_not_match_payload_type(
+    service_type: iox2.ServiceType,
+    value: ctypes.Structure,
+    reason: str,
+) -> None:
+    config = iox2.testing.generate_isolated_config()
+    node = iox2.NodeBuilder.new().config(config).create(service_type)
+
+    service_name = iox2.testing.generate_service_name()
+    service = (
+        node.service_builder(service_name).publish_subscribe(LargePayload).create()
+    )
+    publisher = service.publisher_builder().create()
+    subscriber = service.subscriber_builder().create()
+
+    with pytest.raises(AssertionError, match=reason):
+        publisher.send_copy(value)
+
+    assert subscriber.receive() is None
+
+
+@pytest.mark.parametrize("service_type", service_types)
+@pytest.mark.parametrize(
+    "value, reason",
+    [
+        (Payload(data=1), "size"),
+        ((ctypes.c_uint8 * ctypes.sizeof(LargePayload))(), "alignment"),
+    ],
+)
+def test_write_payload_fails_when_value_layout_does_not_match_payload_type(
+    service_type: iox2.ServiceType,
+    value: ctypes.Structure,
+    reason: str,
+) -> None:
+    config = iox2.testing.generate_isolated_config()
+    node = iox2.NodeBuilder.new().config(config).create(service_type)
+
+    service_name = iox2.testing.generate_service_name()
+    service = (
+        node.service_builder(service_name).publish_subscribe(LargePayload).create()
+    )
+    publisher = service.publisher_builder().create()
+
+    sample_uninit = publisher.loan_uninit()
+
+    with pytest.raises(AssertionError, match=reason):
+        sample_uninit.write_payload(value)

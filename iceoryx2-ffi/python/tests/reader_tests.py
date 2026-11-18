@@ -143,3 +143,29 @@ def test_deleting_reader_removes_it_from_the_service(
         sut = service.reader_builder().create()
     except iox2.ReaderCreateError:
         assert False
+
+
+@pytest.mark.parametrize("service_type", service_types)
+@pytest.mark.parametrize(
+    "key, reason",
+    [(ctypes.c_uint8(1), "size"), ((ctypes.c_uint8 * 8)(), "alignment")],
+)
+def test_handle_cannot_be_acquired_when_key_layout_does_not_match_key_type(
+    service_type: iox2.ServiceType,
+    key: ctypes.c_uint8,
+    reason: str,
+) -> None:
+    config = iox2.testing.generate_isolated_config()
+    node = iox2.NodeBuilder.new().config(config).create(service_type)
+    service_name = iox2.testing.generate_service_name()
+    service = (
+        node.service_builder(service_name)
+        .blackboard_creator(ctypes.c_uint64)
+        .add(ctypes.c_uint64(0), ctypes.c_uint64(0))
+        .create()
+    )
+
+    reader = service.reader_builder().create()
+
+    with pytest.raises(AssertionError, match=reason):
+        reader.entry(key, ctypes.c_uint64)
