@@ -52,8 +52,53 @@ impl ServiceBuilder {
         }
     }
 
+    /// Returns the `ServiceBuilderPublishSubscribe` to create a new publish-subscribe service.
+    /// The payload ctype must be provided as argument.
+    pub fn publish_subscribe(
+        &self,
+        t: &Bound<'_, PyAny>,
+    ) -> PyResult<ServiceBuilderPublishSubscribe> {
+        self.publish_subscribe_builder().with_payload_type(t)
+    }
+
+    /// Returns the `ServiceBuilderRequestResponse` to create a new request-response service.
+    ///
+    /// The request/response payload ctype must be provided as argument.
+    pub fn request_response(
+        &self,
+        request: &Bound<'_, PyAny>,
+        response: &Bound<'_, PyAny>,
+    ) -> PyResult<ServiceBuilderRequestResponse> {
+        self.request_response_builder()
+            .with_payload_types(request, response)
+    }
+
+    /// Returns the `ServiceBuilderBlackboardCreator` to create a new blackboard service.
+    ///
+    /// The key ctype must be provided as argument. If the key is of type ctypes.Structure,
+    /// it must implement __eq__.
+    pub fn blackboard_creator(
+        &self,
+        key: &Bound<'_, PyAny>,
+    ) -> PyResult<ServiceBuilderBlackboardCreator> {
+        self.blackboard_creator_builder().with_key_type(key)
+    }
+
+    /// Returns the `ServiceBuilderBlackboardOpener` to open a blackboard service.
+    ///
+    /// The key ctype must be provided as argument.
+    pub fn blackboard_opener(
+        &self,
+        key: &Bound<'_, PyAny>,
+    ) -> PyResult<ServiceBuilderBlackboardOpener> {
+        self.blackboard_opener_builder().with_key_type(key)
+    }
+}
+
+// Helpers of the Python-side methods that are no longer part of the Python API.
+impl ServiceBuilder {
     /// Create a new builder to create a `MessagingPattern.PublishSubscribe` `Service`.
-    pub fn __publish_subscribe(&self) -> ServiceBuilderPublishSubscribe {
+    pub(crate) fn publish_subscribe_builder(&self) -> ServiceBuilderPublishSubscribe {
         match &*self.0.lock() {
             ServiceBuilderType::Ipc(v) => {
                 let this = v.clone();
@@ -73,7 +118,7 @@ impl ServiceBuilder {
     }
 
     /// Create a new builder to create a `MessagingPattern.RequestResponse` `Service`.
-    pub fn __request_response(&self) -> ServiceBuilderRequestResponse {
+    pub(crate) fn request_response_builder(&self) -> ServiceBuilderRequestResponse {
         match &*self.0.lock() {
             ServiceBuilderType::Ipc(v) => {
                 let this = v.clone();
@@ -95,7 +140,7 @@ impl ServiceBuilder {
     }
 
     /// Create a new builder to create a `MessagingPattern.Blackboard` `Service`.
-    pub fn __blackboard_creator(&self) -> ServiceBuilderBlackboardCreator {
+    pub(crate) fn blackboard_creator_builder(&self) -> ServiceBuilderBlackboardCreator {
         match &*self.0.lock() {
             ServiceBuilderType::Ipc(v) => {
                 let this = v.clone();
@@ -113,7 +158,7 @@ impl ServiceBuilder {
     }
 
     /// Create a new builder to open a `MessagingPattern.Blackboard` `Service`.
-    pub fn __blackboard_opener(&self) -> ServiceBuilderBlackboardOpener {
+    pub(crate) fn blackboard_opener_builder(&self) -> ServiceBuilderBlackboardOpener {
         match &*self.0.lock() {
             ServiceBuilderType::Ipc(v) => {
                 let this = v.clone();

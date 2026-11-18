@@ -65,6 +65,7 @@ pub mod port_factory_subscriber;
 pub mod port_factory_writer;
 pub mod port_name;
 pub mod publisher;
+pub mod python_types;
 pub mod reader;
 pub mod request_header;
 pub mod request_mut;

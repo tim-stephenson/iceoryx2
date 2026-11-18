@@ -10,6 +10,7 @@
 //
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
+use crate::python_types::{self, PayloadKind, ensure};
 use iceoryx2::service::marker::{CustomHeaderMarker, CustomPayloadMarker};
 use iceoryx2_bb_container::string::StaticString;
 use iceoryx2_bb_flatbuffers::TypeName;
@@ -95,102 +96,6 @@ impl ServiceBuilderRequestResponse {
 
 #[pymethods]
 impl ServiceBuilderRequestResponse {
-    pub fn __set_request_payload_type(&mut self, value: Py<PyAny>) {
-        self.request_payload_type_details.value = Some(value)
-    }
-
-    pub fn __set_response_payload_type(&mut self, value: Py<PyAny>) {
-        self.response_payload_type_details.value = Some(value)
-    }
-
-    pub fn __set_request_header_type(&mut self, value: Py<PyAny>) {
-        self.request_header_type_details.value = Some(value)
-    }
-
-    pub fn __set_response_header_type(&mut self, value: Py<PyAny>) {
-        self.response_header_type_details.value = Some(value)
-    }
-
-    #[getter]
-    pub fn __get_request_payload_type_details(&self) -> Option<Py<PyAny>> {
-        self.request_payload_type_details.clone().value
-    }
-
-    #[getter]
-    pub fn __get_response_payload_type_details(&self) -> Option<Py<PyAny>> {
-        self.response_payload_type_details.clone().value
-    }
-
-    /// Defines the payload type for requests. To be able to connect to a `Service` the
-    /// `TypeDetail` must be identical in all participants since the communication is always
-    /// strongly typed.
-    pub fn __request_payload_type_details(&self, value: &TypeDetail) -> Self {
-        match &self.value {
-            ServiceBuilderRequestResponseType::Ipc(v) => {
-                let this = v.clone();
-                let this = unsafe { this.__internal_set_request_payload_type_details(&value.0) };
-                self.clone_ipc(this)
-            }
-            ServiceBuilderRequestResponseType::Local(v) => {
-                let this = v.clone();
-                let this = unsafe { this.__internal_set_request_payload_type_details(&value.0) };
-                self.clone_local(this)
-            }
-        }
-    }
-
-    /// Defines the request header type. To be able to connect to a `Service` the `TypeDetail` must
-    /// be identical in all participants since the communication is always strongly typed.
-    pub fn __request_header_type_details(&self, value: &TypeDetail) -> Self {
-        match &self.value {
-            ServiceBuilderRequestResponseType::Ipc(v) => {
-                let this = v.clone();
-                let this = unsafe { this.__internal_set_request_header_type_details(&value.0) };
-                self.clone_ipc(this)
-            }
-            ServiceBuilderRequestResponseType::Local(v) => {
-                let this = v.clone();
-                let this = unsafe { this.__internal_set_request_header_type_details(&value.0) };
-                self.clone_local(this)
-            }
-        }
-    }
-
-    /// Defines the payload type for responses. To be able to connect to a `Service` the
-    /// `TypeDetail` must be identical in all participants since the communication is always
-    /// strongly typed.
-    pub fn __response_payload_type_details(&self, value: &TypeDetail) -> Self {
-        match &self.value {
-            ServiceBuilderRequestResponseType::Ipc(v) => {
-                let this = v.clone();
-                let this = unsafe { this.__internal_set_response_payload_type_details(&value.0) };
-                self.clone_ipc(this)
-            }
-            ServiceBuilderRequestResponseType::Local(v) => {
-                let this = v.clone();
-                let this = unsafe { this.__internal_set_response_payload_type_details(&value.0) };
-                self.clone_local(this)
-            }
-        }
-    }
-
-    /// Defines the response header type. To be able to connect to a `Service` the `TypeDetail`
-    /// must be identical in all participants since the communication is always strongly typed.
-    pub fn __response_header_type_details(&self, value: &TypeDetail) -> Self {
-        match &self.value {
-            ServiceBuilderRequestResponseType::Ipc(v) => {
-                let this = v.clone();
-                let this = unsafe { this.__internal_set_response_header_type_details(&value.0) };
-                self.clone_ipc(this)
-            }
-            ServiceBuilderRequestResponseType::Local(v) => {
-                let this = v.clone();
-                let this = unsafe { this.__internal_set_response_header_type_details(&value.0) };
-                self.clone_local(this)
-            }
-        }
-    }
-
     /// Overrides and increases the alignment of the request payload - useful when the payload is
     /// used in SIMD operations. To be able to connect to a `Service` the payload alignment must be
     /// identical in all participants since the communication is always strongly typed.
@@ -399,92 +304,6 @@ impl ServiceBuilderRequestResponse {
             ServiceBuilderRequestResponseType::Local(v) => {
                 let this = v.clone();
                 let this = this.max_borrowed_responses_per_pending_response(value);
-                self.clone_local(this)
-            }
-        }
-    }
-
-    pub fn __internal_request_type_definition_name_hint(
-        &self,
-        name: &str,
-        namespace: &str,
-    ) -> Self {
-        let type_name = TypeName {
-            name: StaticString::from_str_truncated(name)
-                .expect("Typenames contain only valid UTF-8 characters."),
-            namespace: StaticString::from_str_truncated(namespace)
-                .expect("Namespace names contain only valid UTF-8 characters."),
-        };
-        match &self.value {
-            ServiceBuilderRequestResponseType::Ipc(v) => {
-                let this = v.clone();
-                let this = this.__internal_request_type_definition_name_hint(&type_name);
-                self.clone_ipc(this)
-            }
-            ServiceBuilderRequestResponseType::Local(v) => {
-                let this = v.clone();
-                let this = this.__internal_request_type_definition_name_hint(&type_name);
-                self.clone_local(this)
-            }
-        }
-    }
-
-    pub fn __internal_response_type_definition_name_hint(
-        &self,
-        name: &str,
-        namespace: &str,
-    ) -> Self {
-        let type_name = TypeName {
-            name: StaticString::from_str_truncated(name)
-                .expect("Typenames contain only valid UTF-8 characters."),
-            namespace: StaticString::from_str_truncated(namespace)
-                .expect("Namespace names contain only valid UTF-8 characters."),
-        };
-        match &self.value {
-            ServiceBuilderRequestResponseType::Ipc(v) => {
-                let this = v.clone();
-                let this = this.__internal_response_type_definition_name_hint(&type_name);
-                self.clone_ipc(this)
-            }
-            ServiceBuilderRequestResponseType::Local(v) => {
-                let this = v.clone();
-                let this = this.__internal_response_type_definition_name_hint(&type_name);
-                self.clone_local(this)
-            }
-        }
-    }
-
-    /// Sets the path to the flatbuffer schema file for the Request. If this is not explicitly
-    /// defined, iceoryx2 will try to find the best fitting schema file in the configured
-    /// filebuffer schema paths defined in the config.
-    pub fn __internal_request_flatbuffer_schema_path(&self, path: &FilePath) -> Self {
-        match &self.value {
-            ServiceBuilderRequestResponseType::Ipc(v) => {
-                let this = v.clone();
-                let this = unsafe { this.__internal_request_flatbuffer_schema_path(&path.0) };
-                self.clone_ipc(this)
-            }
-            ServiceBuilderRequestResponseType::Local(v) => {
-                let this = v.clone();
-                let this = unsafe { this.__internal_request_flatbuffer_schema_path(&path.0) };
-                self.clone_local(this)
-            }
-        }
-    }
-
-    /// Sets the path to the flatbuffer schema file for the Response. If this is not explicitly
-    /// defined, iceoryx2 will try to find the best fitting schema file in the configured
-    /// filebuffer schema paths defined in the config.
-    pub fn __internal_response_flatbuffer_schema_path(&self, path: &FilePath) -> Self {
-        match &self.value {
-            ServiceBuilderRequestResponseType::Ipc(v) => {
-                let this = v.clone();
-                let this = unsafe { this.__internal_response_flatbuffer_schema_path(&path.0) };
-                self.clone_ipc(this)
-            }
-            ServiceBuilderRequestResponseType::Local(v) => {
-                let this = v.clone();
-                let this = unsafe { this.__internal_response_flatbuffer_schema_path(&path.0) };
                 self.clone_local(this)
             }
         }
@@ -707,5 +526,226 @@ impl ServiceBuilderRequestResponse {
                 })
             }
         }
+    }
+
+    /// Sets the request header type for the service.
+    pub fn request_header(&self, request: &Bound<'_, PyAny>) -> PyResult<Self> {
+        let mut this =
+            self.set_request_header_type_details(&python_types::fixed_size_type_detail(request)?);
+        this.request_header_type_details =
+            TypeStorage::with_kind(request.clone().unbind(), PayloadKind::FixedSize);
+        Ok(this)
+    }
+
+    /// Sets the path to the flatbuffer schema file of the request.
+    ///
+    /// If this is not explicitly defined, iceoryx2 will try to find the best fitting schema file
+    /// in the configured flatbuffer schema paths defined in the config.
+    pub fn request_flatbuffer_schema_path(&self, value: &FilePath) -> PyResult<Self> {
+        ensure(
+            self.request_payload_type_details.kind == PayloadKind::Flatbuffer,
+            "a flatbuffer schema path requires a `Flatbuffer` request payload",
+        )?;
+        Ok(self.request_flatbuffer_schema_path_unchecked(value))
+    }
+
+    /// Sets the response header type for the service.
+    pub fn response_header(&self, response: &Bound<'_, PyAny>) -> PyResult<Self> {
+        let mut this =
+            self.set_response_header_type_details(&python_types::fixed_size_type_detail(response)?);
+        this.response_header_type_details =
+            TypeStorage::with_kind(response.clone().unbind(), PayloadKind::FixedSize);
+        Ok(this)
+    }
+
+    /// Sets the path to the flatbuffer schema file of the response.
+    ///
+    /// If this is not explicitly defined, iceoryx2 will try to find the best fitting schema file
+    /// in the configured flatbuffer schema paths defined in the config.
+    pub fn response_flatbuffer_schema_path(&self, value: &FilePath) -> PyResult<Self> {
+        ensure(
+            self.response_payload_type_details.kind == PayloadKind::Flatbuffer,
+            "a flatbuffer schema path requires a `Flatbuffer` response payload",
+        )?;
+        Ok(self.response_flatbuffer_schema_path_unchecked(value))
+    }
+}
+
+// Helpers of the Python-side methods that are no longer part of the Python API.
+impl ServiceBuilderRequestResponse {
+    /// Defines the payload type for requests. To be able to connect to a `Service` the
+    /// `TypeDetail` must be identical in all participants since the communication is always
+    /// strongly typed.
+    pub(crate) fn set_request_payload_type_details(&self, value: &TypeDetail) -> Self {
+        match &self.value {
+            ServiceBuilderRequestResponseType::Ipc(v) => {
+                let this = v.clone();
+                let this = unsafe { this.__internal_set_request_payload_type_details(&value.0) };
+                self.clone_ipc(this)
+            }
+            ServiceBuilderRequestResponseType::Local(v) => {
+                let this = v.clone();
+                let this = unsafe { this.__internal_set_request_payload_type_details(&value.0) };
+                self.clone_local(this)
+            }
+        }
+    }
+
+    /// Defines the request header type. To be able to connect to a `Service` the `TypeDetail` must
+    /// be identical in all participants since the communication is always strongly typed.
+    pub(crate) fn set_request_header_type_details(&self, value: &TypeDetail) -> Self {
+        match &self.value {
+            ServiceBuilderRequestResponseType::Ipc(v) => {
+                let this = v.clone();
+                let this = unsafe { this.__internal_set_request_header_type_details(&value.0) };
+                self.clone_ipc(this)
+            }
+            ServiceBuilderRequestResponseType::Local(v) => {
+                let this = v.clone();
+                let this = unsafe { this.__internal_set_request_header_type_details(&value.0) };
+                self.clone_local(this)
+            }
+        }
+    }
+
+    /// Defines the payload type for responses. To be able to connect to a `Service` the
+    /// `TypeDetail` must be identical in all participants since the communication is always
+    /// strongly typed.
+    pub(crate) fn set_response_payload_type_details(&self, value: &TypeDetail) -> Self {
+        match &self.value {
+            ServiceBuilderRequestResponseType::Ipc(v) => {
+                let this = v.clone();
+                let this = unsafe { this.__internal_set_response_payload_type_details(&value.0) };
+                self.clone_ipc(this)
+            }
+            ServiceBuilderRequestResponseType::Local(v) => {
+                let this = v.clone();
+                let this = unsafe { this.__internal_set_response_payload_type_details(&value.0) };
+                self.clone_local(this)
+            }
+        }
+    }
+
+    /// Defines the response header type. To be able to connect to a `Service` the `TypeDetail`
+    /// must be identical in all participants since the communication is always strongly typed.
+    pub(crate) fn set_response_header_type_details(&self, value: &TypeDetail) -> Self {
+        match &self.value {
+            ServiceBuilderRequestResponseType::Ipc(v) => {
+                let this = v.clone();
+                let this = unsafe { this.__internal_set_response_header_type_details(&value.0) };
+                self.clone_ipc(this)
+            }
+            ServiceBuilderRequestResponseType::Local(v) => {
+                let this = v.clone();
+                let this = unsafe { this.__internal_set_response_header_type_details(&value.0) };
+                self.clone_local(this)
+            }
+        }
+    }
+
+    pub(crate) fn request_type_definition_name_hint(&self, name: &str, namespace: &str) -> Self {
+        let type_name = TypeName {
+            name: StaticString::from_str_truncated(name)
+                .expect("Typenames contain only valid UTF-8 characters."),
+            namespace: StaticString::from_str_truncated(namespace)
+                .expect("Namespace names contain only valid UTF-8 characters."),
+        };
+        match &self.value {
+            ServiceBuilderRequestResponseType::Ipc(v) => {
+                let this = v.clone();
+                let this = this.__internal_request_type_definition_name_hint(&type_name);
+                self.clone_ipc(this)
+            }
+            ServiceBuilderRequestResponseType::Local(v) => {
+                let this = v.clone();
+                let this = this.__internal_request_type_definition_name_hint(&type_name);
+                self.clone_local(this)
+            }
+        }
+    }
+
+    /// Sets the path to the flatbuffer schema file for the Request. If this is not explicitly
+    /// defined, iceoryx2 will try to find the best fitting schema file in the configured
+    /// filebuffer schema paths defined in the config.
+    pub(crate) fn request_flatbuffer_schema_path_unchecked(&self, path: &FilePath) -> Self {
+        match &self.value {
+            ServiceBuilderRequestResponseType::Ipc(v) => {
+                let this = v.clone();
+                let this = unsafe { this.__internal_request_flatbuffer_schema_path(&path.0) };
+                self.clone_ipc(this)
+            }
+            ServiceBuilderRequestResponseType::Local(v) => {
+                let this = v.clone();
+                let this = unsafe { this.__internal_request_flatbuffer_schema_path(&path.0) };
+                self.clone_local(this)
+            }
+        }
+    }
+
+    pub(crate) fn response_type_definition_name_hint(&self, name: &str, namespace: &str) -> Self {
+        let type_name = TypeName {
+            name: StaticString::from_str_truncated(name)
+                .expect("Typenames contain only valid UTF-8 characters."),
+            namespace: StaticString::from_str_truncated(namespace)
+                .expect("Namespace names contain only valid UTF-8 characters."),
+        };
+        match &self.value {
+            ServiceBuilderRequestResponseType::Ipc(v) => {
+                let this = v.clone();
+                let this = this.__internal_response_type_definition_name_hint(&type_name);
+                self.clone_ipc(this)
+            }
+            ServiceBuilderRequestResponseType::Local(v) => {
+                let this = v.clone();
+                let this = this.__internal_response_type_definition_name_hint(&type_name);
+                self.clone_local(this)
+            }
+        }
+    }
+
+    /// Sets the path to the flatbuffer schema file for the Response. If this is not explicitly
+    /// defined, iceoryx2 will try to find the best fitting schema file in the configured
+    /// filebuffer schema paths defined in the config.
+    pub(crate) fn response_flatbuffer_schema_path_unchecked(&self, path: &FilePath) -> Self {
+        match &self.value {
+            ServiceBuilderRequestResponseType::Ipc(v) => {
+                let this = v.clone();
+                let this = unsafe { this.__internal_response_flatbuffer_schema_path(&path.0) };
+                self.clone_ipc(this)
+            }
+            ServiceBuilderRequestResponseType::Local(v) => {
+                let this = v.clone();
+                let this = unsafe { this.__internal_response_flatbuffer_schema_path(&path.0) };
+                self.clone_local(this)
+            }
+        }
+    }
+
+    /// Defines the request and response payload types, each a ctypes type, `Slice[T]` or
+    /// `Flatbuffer[T]`, and no user headers.
+    pub(crate) fn with_payload_types(
+        &self,
+        request: &Bound<'_, PyAny>,
+        response: &Bound<'_, PyAny>,
+    ) -> PyResult<Self> {
+        let request_payload = python_types::payload_type_detail(request)?;
+        let response_payload = python_types::payload_type_detail(response)?;
+        let unit = python_types::unit_type_detail()?;
+        let mut this = self
+            .set_request_payload_type_details(&request_payload.type_detail)
+            .set_request_header_type_details(&unit)
+            .set_response_payload_type_details(&response_payload.type_detail)
+            .set_response_header_type_details(&unit);
+        if let Some(name) = &request_payload.flatbuffer_type_name {
+            this = this.request_type_definition_name_hint(name, "");
+        }
+        if let Some(name) = &response_payload.flatbuffer_type_name {
+            this = this.response_type_definition_name_hint(name, "");
+        }
+        this.request_payload_type_details =
+            TypeStorage::with_kind(request.clone().unbind(), request_payload.kind);
+        this.response_payload_type_details =
+            TypeStorage::with_kind(response.clone().unbind(), response_payload.kind);
+        Ok(this)
     }
 }

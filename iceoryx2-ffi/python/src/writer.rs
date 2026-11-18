@@ -10,6 +10,7 @@
 //
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
+use crate::python_types;
 use iceoryx2::service::marker::CustomKeyMarker;
 use iceoryx2_log::fatal_panic;
 use pyo3::prelude::*;
@@ -38,11 +39,6 @@ pub struct Writer {
 #[pymethods]
 impl Writer {
     #[getter]
-    pub fn __key_type_details(&self) -> Option<Py<PyAny>> {
-        self.key_type_storage.clone().value
-    }
-
-    #[getter]
     /// Returns the `UniqueWriterId` of the `Writer`
     pub fn id(&self) -> UniqueWriterId {
         match &*self.value.lock() {
@@ -64,10 +60,49 @@ impl Writer {
         }
     }
 
+    /// Releases the `Writer`.
+    ///
+    /// After this call the `Writer` is no longer usable!
+    pub fn delete(&mut self) {
+        match *self.value.lock() {
+            WriterType::Ipc(ref mut v) => {
+                v.take();
+            }
+            WriterType::Local(ref mut v) => {
+                v.take();
+            }
+        }
+    }
+
+    /// Creates an `EntryHandleMut` for direct write access to the value.
+    ///
+    /// There can be only one `EntryHandleMut` per value. On failure it returns
+    /// `EntryHandleMutError` describing the failure.
+    pub fn entry(
+        &self,
+        key: &Bound<'_, PyAny>,
+        value: &Bound<'_, PyAny>,
+    ) -> PyResult<EntryHandleMut> {
+        python_types::ensure_layout(key, self.key_type_storage.value.as_ref())?;
+        let mut entry_handle = self.entry_unchecked(
+            python_types::addressof(key)?,
+            python_types::fixed_size_type_detail(value)?,
+        )?;
+        entry_handle.set_value_type(value.clone().unbind());
+        Ok(entry_handle)
+    }
+}
+
+// Helpers of the Python-side methods that are no longer part of the Python API.
+impl Writer {
     /// Creates an `EntryHandleMut` for direct write access to the value. There can be only one
     /// `EntryHandleMut` per value. On failure it returns `EntryHandleMutError` describing the
     /// failure.
-    pub fn __entry(&self, key: usize, value_type_details: TypeDetail) -> PyResult<EntryHandleMut> {
+    pub(crate) fn entry_unchecked(
+        &self,
+        key: usize,
+        value_type_details: TypeDetail,
+    ) -> PyResult<EntryHandleMut> {
         match &*self.value.lock() {
             WriterType::Ipc(Some(v)) => {
                 let entry_handle = unsafe {
@@ -93,20 +128,6 @@ impl Writer {
             }
             _ => fatal_panic!(from "Writer::entry()",
                     "Accessing a deleted writer."),
-        }
-    }
-
-    /// Releases the `Writer`.
-    ///
-    /// After this call the `Writer` is no longer usable!
-    pub fn delete(&mut self) {
-        match *self.value.lock() {
-            WriterType::Ipc(ref mut v) => {
-                v.take();
-            }
-            WriterType::Local(ref mut v) => {
-                v.take();
-            }
         }
     }
 }

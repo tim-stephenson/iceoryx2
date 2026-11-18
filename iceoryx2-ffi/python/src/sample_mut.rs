@@ -10,6 +10,7 @@
 //
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
+use crate::python_types::{PayloadKind, ensure};
 use iceoryx2::service::marker::{CustomHeaderMarker, CustomPayloadMarker};
 use iceoryx2_log::fatal_panic;
 use pyo3::prelude::*;
@@ -72,15 +73,6 @@ impl SampleMut {
             SampleMutType::Ipc(Some(v)) => v.payload().len(),
             SampleMutType::Local(Some(v)) => v.payload().len(),
             _ => fatal_panic!(from "Sample::header()",
-                "Accessing a released sample."),
-        }
-    }
-
-    pub fn __truncate(&self, number_of_elements: usize) {
-        match &mut *self.value.lock() {
-            SampleMutType::Ipc(Some(v)) => v.truncate(number_of_elements),
-            SampleMutType::Local(Some(v)) => v.truncate(number_of_elements),
-            _ => fatal_panic!(from "SampleMut::__truncate()",
                 "Accessing a released sample."),
         }
     }
@@ -157,6 +149,32 @@ impl SampleMut {
                     .send()
                     .map_err(|e| SendError::new_err(format!("{e:?}")))?)
             }
+        }
+    }
+
+    /// Shortens the payload to its first `number_of_elements` elements, so that only those are
+    /// sent.
+    ///
+    /// It has no effect when `number_of_elements` is not smaller than the current number of
+    /// elements. Fails when it is called for data types which are not a slice.
+    pub fn truncate(&self, number_of_elements: usize) -> PyResult<()> {
+        ensure(
+            self.payload_type_details.kind == PayloadKind::Slice,
+            "`truncate()` requires a `Slice` payload",
+        )?;
+        self.truncate_unchecked(number_of_elements);
+        Ok(())
+    }
+}
+
+// Helpers of the Python-side methods that are no longer part of the Python API.
+impl SampleMut {
+    pub(crate) fn truncate_unchecked(&self, number_of_elements: usize) {
+        match &mut *self.value.lock() {
+            SampleMutType::Ipc(Some(v)) => v.truncate(number_of_elements),
+            SampleMutType::Local(Some(v)) => v.truncate(number_of_elements),
+            _ => fatal_panic!(from "SampleMut::__truncate()",
+                "Accessing a released sample."),
         }
     }
 }

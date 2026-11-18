@@ -37,26 +37,6 @@ impl EntryHandle {
         self.value_type_storage.clone().value
     }
 
-    pub fn __set_value_type(&mut self, value: Py<PyAny>) {
-        self.value_type_storage.value = Some(value)
-    }
-
-    pub fn __set_value_ptr(&mut self) {
-        let value_size = self.value_type_details.0.size();
-        let value_alignment = self.value_type_details.0.alignment();
-        let layout =
-            unsafe { core::alloc::Layout::from_size_align_unchecked(value_size, value_alignment) };
-        // The corresponding dealloc is implemented in InternalValueStorage::drop().
-        let value_buffer = unsafe { std::alloc::alloc(layout) };
-        if value_buffer.is_null() {
-            panic!("out-of-memory in set value ptr operation");
-        }
-        self.value_ptr = Parc::new(InternalValueStorage {
-            value_buffer,
-            value_type_details: self.value_type_details.clone(),
-        });
-    }
-
     // Stores a copy of the blackboard value into `value_ptr` and returns a tuple containing the
     // pointer as usize and the value's generation counter.
     pub fn __get(&self) -> (usize, u64) {
@@ -91,13 +71,6 @@ impl EntryHandle {
         }
     }
 
-    pub fn __is_up_to_date(&self, generation_counter: u64) -> bool {
-        match &*self.value.lock() {
-            EntryHandleType::Ipc(v) => v.is_up_to_date(generation_counter),
-            EntryHandleType::Local(v) => v.is_up_to_date(generation_counter),
-        }
-    }
-
     /// Returns an ID corresponding to the entry which can be used in an event based communication
     /// setup.
     #[getter]
@@ -105,6 +78,42 @@ impl EntryHandle {
         match &*self.value.lock() {
             EntryHandleType::Ipc(v) => EventId::new(v.entry_id().as_value()),
             EntryHandleType::Local(v) => EventId::new(v.entry_id().as_value()),
+        }
+    }
+
+    /// Checks if ``value`` is up-to-date.
+    pub fn is_up_to_date(&self, value: &Bound<'_, PyAny>) -> PyResult<bool> {
+        let generation_counter: u64 = value.getattr("_generation_counter")?.extract()?;
+        Ok(self.is_up_to_date_unchecked(generation_counter))
+    }
+}
+
+// Helpers of the Python-side methods that are no longer part of the Python API.
+impl EntryHandle {
+    pub(crate) fn set_value_type(&mut self, value: Py<PyAny>) {
+        self.value_type_storage.value = Some(value)
+    }
+
+    pub(crate) fn set_value_ptr(&mut self) {
+        let value_size = self.value_type_details.0.size();
+        let value_alignment = self.value_type_details.0.alignment();
+        let layout =
+            unsafe { core::alloc::Layout::from_size_align_unchecked(value_size, value_alignment) };
+        // The corresponding dealloc is implemented in InternalValueStorage::drop().
+        let value_buffer = unsafe { std::alloc::alloc(layout) };
+        if value_buffer.is_null() {
+            panic!("out-of-memory in set value ptr operation");
+        }
+        self.value_ptr = Parc::new(InternalValueStorage {
+            value_buffer,
+            value_type_details: self.value_type_details.clone(),
+        });
+    }
+
+    pub(crate) fn is_up_to_date_unchecked(&self, generation_counter: u64) -> bool {
+        match &*self.value.lock() {
+            EntryHandleType::Ipc(v) => v.is_up_to_date(generation_counter),
+            EntryHandleType::Local(v) => v.is_up_to_date(generation_counter),
         }
     }
 }

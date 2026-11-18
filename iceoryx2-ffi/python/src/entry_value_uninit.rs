@@ -10,6 +10,7 @@
 //
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
+use crate::python_types;
 use iceoryx2_log::fatal_panic;
 use pyo3::prelude::*;
 
@@ -47,29 +48,6 @@ impl EntryValueUninit {
         }
     }
 
-    pub fn __update_write_cell(&mut self) -> EntryHandleMut {
-        match &mut *self.value.lock() {
-            EntryValueUninitType::Ipc(v) => {
-                let entry_value_uninit = v.take().unwrap();
-                let entry_handle_mut = entry_value_uninit.update();
-                EntryHandleMut {
-                    value: Parc::new(EntryHandleMutType::Ipc(Some(entry_handle_mut))),
-                    value_type_storage: self.value_type_storage.clone(),
-                    value_type_details: self.value_type_details.clone(),
-                }
-            }
-            EntryValueUninitType::Local(v) => {
-                let entry_value_uninit = v.take().unwrap();
-                let entry_handle_mut = entry_value_uninit.update();
-                EntryHandleMut {
-                    value: Parc::new(EntryHandleMutType::Local(Some(entry_handle_mut))),
-                    value_type_storage: self.value_type_storage.clone(),
-                    value_type_details: self.value_type_details.clone(),
-                }
-            }
-        }
-    }
-
     /// Discards the `EntryValueUninit` and returns the original
     /// `EntryHandleMut`.
     pub fn discard(&mut self) -> EntryHandleMut {
@@ -86,6 +64,50 @@ impl EntryValueUninit {
             EntryValueUninitType::Local(v) => {
                 let entry_value_uninit = v.take().unwrap();
                 let entry_handle_mut = entry_value_uninit.discard();
+                EntryHandleMut {
+                    value: Parc::new(EntryHandleMutType::Local(Some(entry_handle_mut))),
+                    value_type_storage: self.value_type_storage.clone(),
+                    value_type_details: self.value_type_details.clone(),
+                }
+            }
+        }
+    }
+
+    /// Makes the new value accessible.
+    ///
+    /// Consumes the `EntryValueUninit`, makes the new value accessible and returns the original
+    /// `EntryHandleMut`.
+    pub fn assume_init_and_update(&mut self) -> EntryHandleMut {
+        self.update_write_cell()
+    }
+
+    /// Updates the entry value.
+    ///
+    /// Consumes the `EntryValueUninit`, writes the value to the entry and returns the original
+    /// `EntryHandleMut`.
+    pub fn update_with_copy(&mut self, value: &Bound<'_, PyAny>) -> PyResult<EntryHandleMut> {
+        let size = python_types::ensure_layout(value, self.value_type_storage.value.as_ref())?;
+        python_types::copy_bytes(value, self.__get_write_cell(), size)?;
+        Ok(self.update_write_cell())
+    }
+}
+
+// Helpers of the Python-side methods that are no longer part of the Python API.
+impl EntryValueUninit {
+    pub(crate) fn update_write_cell(&mut self) -> EntryHandleMut {
+        match &mut *self.value.lock() {
+            EntryValueUninitType::Ipc(v) => {
+                let entry_value_uninit = v.take().unwrap();
+                let entry_handle_mut = entry_value_uninit.update();
+                EntryHandleMut {
+                    value: Parc::new(EntryHandleMutType::Ipc(Some(entry_handle_mut))),
+                    value_type_storage: self.value_type_storage.clone(),
+                    value_type_details: self.value_type_details.clone(),
+                }
+            }
+            EntryValueUninitType::Local(v) => {
+                let entry_value_uninit = v.take().unwrap();
+                let entry_handle_mut = entry_value_uninit.update();
                 EntryHandleMut {
                     value: Parc::new(EntryHandleMutType::Local(Some(entry_handle_mut))),
                     value_type_storage: self.value_type_storage.clone(),
