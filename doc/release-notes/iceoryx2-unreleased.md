@@ -48,6 +48,7 @@
 * [#2137](https://github.com/eclipse-iceoryx/iceoryx2/issues/2137) Fix typo in `BackpressureAction` enum
 * [#2142](https://github.com/eclipse-iceoryx/iceoryx2/issues/2142) Initialize the node counter of the global management segment when the segment is created
 * [#2198](https://github.com/eclipse-iceoryx/iceoryx2/issues/2198) Fix 'iceoryx2.h' header generation for Rust 1.100.0
+* [#2215](https://github.com/eclipse-iceoryx/iceoryx2/issues/2215) Return the `Slice` payload of a `PendingResponse` in the Python bindings
 
 ### Refactoring
 

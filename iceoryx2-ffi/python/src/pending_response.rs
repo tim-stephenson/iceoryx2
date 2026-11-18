@@ -200,7 +200,7 @@ impl PendingResponse {
             slf.as_any(),
             &this.request_payload_type_details,
             this.payload_ptr(),
-            None,
+            this.header().number_of_elements(),
         )
     }
 

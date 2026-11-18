@@ -236,21 +236,7 @@ def test_user_header_fails_without_user_header_type(name: str) -> None:
         sut.user_header()
 
 
-# `PendingResponse` lacks the number of elements that `payload()` of a `Slice` requires
-PENDING_RESPONSE_SLICE_BUG = pytest.mark.xfail(
-    raises=AttributeError, strict=True, reason="PendingResponse has no slice length"
-)
-ALL_WITHOUT_SLICE_BUG = [
-    (
-        pytest.param(name, marks=PENDING_RESPONSE_SLICE_BUG)
-        if name == "pending_response"
-        else name
-    )
-    for name in ALL
-]
-
-
-@pytest.mark.parametrize("name", ALL_WITHOUT_SLICE_BUG)
+@pytest.mark.parametrize("name", ALL)
 @pytest.mark.parametrize(
     "element_type", [ctypes.c_uint8, ctypes.c_uint32, ctypes.c_uint64]
 )

@@ -157,7 +157,7 @@ impl SampleMut {
             slf.as_any(),
             &this.payload_type_details,
             this.payload_ptr(),
-            Some(this.header().number_of_elements()),
+            this.header().number_of_elements(),
         )
     }
 

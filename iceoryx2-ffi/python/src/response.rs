@@ -111,7 +111,7 @@ impl Response {
             slf.as_any(),
             &this.response_payload_type_details,
             this.payload_ptr(),
-            Some(this.header().number_of_elements()),
+            this.header().number_of_elements(),
         )
     }
 

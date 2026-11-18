@@ -214,7 +214,7 @@ impl ActiveRequest {
             slf.as_any(),
             &this.request_payload_type_details,
             this.payload_ptr(),
-            Some(this.header().number_of_elements()),
+            this.header().number_of_elements(),
         )
     }
 

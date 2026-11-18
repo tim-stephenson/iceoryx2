@@ -15,7 +15,6 @@
 
 use std::sync::Mutex;
 
-use pyo3::exceptions::PyAttributeError;
 use pyo3::prelude::*;
 use pyo3::sync::PyOnceLock;
 use pyo3::types::{PyByteArray, PyBytes, PyDict, PyModule};
@@ -138,13 +137,12 @@ fn payload_kind<'py>(
 }
 
 /// The payload of `owner`: a `Slice` of its `number_of_elements` elements when the payload type
-/// is a `Slice`, otherwise a `ctypes.POINTER` to the payload type. `number_of_elements` is
-/// `None` when `owner` does not provide the number of elements of a `Slice` payload.
+/// is a `Slice`, otherwise a `ctypes.POINTER` to the payload type.
 pub(crate) fn payload<'py>(
     owner: &Bound<'py, PyAny>,
     payload_type: &TypeStorage,
     payload_ptr: usize,
-    number_of_elements: Option<u64>,
+    number_of_elements: u64,
 ) -> PyResult<Py<PyAny>> {
     let py = owner.py();
     ensure(
@@ -152,12 +150,6 @@ pub(crate) fn payload<'py>(
         "the payload type is not defined",
     )?;
     if let Some((PayloadKind::Slice, element_type)) = payload_kind(py, payload_type)? {
-        let Some(number_of_elements) = number_of_elements else {
-            return Err(PyAttributeError::new_err(format!(
-                "'{}' does not provide the length of a `Slice` payload",
-                owner.get_type().name()?
-            )));
-        };
         let number_of_elements = number_of_elements as usize;
         return Ok(slice(owner, payload_ptr, number_of_elements, &element_type)?.unbind());
     }
