@@ -156,7 +156,7 @@ impl SampleMutUninit {
             slf.as_any(),
             &this.payload_type_details,
             this.payload_ptr(),
-            Some(this.__slice_len()),
+            Some(this.header().number_of_elements()),
         )
     }
 
@@ -209,15 +209,6 @@ impl SampleMutUninit {
             SampleMutUninitType::Ipc(Some(v)) => v.truncate(number_of_elements),
             SampleMutUninitType::Local(Some(v)) => v.truncate(number_of_elements),
             _ => fatal_panic!(from "SampleMutUninit::__truncate()",
-                "Accessing a released sample."),
-        }
-    }
-
-    pub fn __slice_len(&self) -> usize {
-        match &*self.value.lock() {
-            SampleMutUninitType::Ipc(Some(v)) => v.payload().len(),
-            SampleMutUninitType::Local(Some(v)) => v.payload().len(),
-            _ => fatal_panic!(from "Sample::__slice_len()",
                 "Accessing a released sample."),
         }
     }

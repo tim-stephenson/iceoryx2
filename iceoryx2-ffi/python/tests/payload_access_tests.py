@@ -236,9 +236,9 @@ def test_user_header_fails_without_user_header_type(name: str) -> None:
         sut.user_header()
 
 
-# `PendingResponse` lacks the `__slice_len` that `payload()` of a `Slice` requires
+# `PendingResponse` lacks the number of elements that `payload()` of a `Slice` requires
 PENDING_RESPONSE_SLICE_BUG = pytest.mark.xfail(
-    raises=AttributeError, strict=True, reason="PendingResponse has no __slice_len"
+    raises=AttributeError, strict=True, reason="PendingResponse has no slice length"
 )
 ALL_WITHOUT_SLICE_BUG = [
     (
@@ -251,32 +251,31 @@ ALL_WITHOUT_SLICE_BUG = [
 
 
 @pytest.mark.parametrize("name", ALL_WITHOUT_SLICE_BUG)
-def test_payload_of_slice_type_is_a_slice_over_the_payload(name: str) -> None:
-    objects = Objects("slice")
+@pytest.mark.parametrize(
+    "element_type", [ctypes.c_uint8, ctypes.c_uint32, ctypes.c_uint64]
+)
+def test_payload_of_slice_type_is_a_slice_over_the_payload_elements(
+    name: str, element_type: Any
+) -> None:
+    objects = Objects("slice", slice_element=element_type)
     sut = getattr(objects, name)()
 
     payload = sut.payload()
 
     assert isinstance(payload, iox2.Slice)
-    assert payload.contained_type is SLICE_ELEMENT
+    assert payload.contained_type is element_type
     assert payload.len() == SLICE_LEN
     assert payload.as_ptr() == sut.payload_ptr
+    assert payload.as_memory_view().nbytes == SLICE_LEN * ctypes.sizeof(element_type)
     if name in INITIALIZED:
         assert [payload[i] for i in range(SLICE_LEN)] == [
             PAYLOAD_VALUE + i for i in range(SLICE_LEN)
         ]
 
-
-@pytest.mark.xfail(
-    strict=True,
-    reason="the length of the Slice is the number of bytes instead of elements",
-)
-@pytest.mark.parametrize("name", ["sample_mut_uninit", "sample_mut", "sample"])
-def test_payload_of_slice_type_has_one_element_per_slice_element(name: str) -> None:
-    objects = Objects("slice", slice_element=ctypes.c_uint64)
-    sut = getattr(objects, name)()
-
-    assert sut.payload().len() == SLICE_LEN
+    with pytest.raises(IndexError):
+        _ = payload[SLICE_LEN]
+    with pytest.raises(IndexError):
+        payload[SLICE_LEN] = 0
 
 
 @pytest.mark.parametrize("name", ALL)

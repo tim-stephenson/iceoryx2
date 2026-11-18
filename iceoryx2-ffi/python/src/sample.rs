@@ -106,7 +106,7 @@ impl Sample {
             slf.as_any(),
             &this.payload_type_details,
             this.payload_ptr(),
-            Some(this.__slice_len()),
+            Some(this.header().number_of_elements()),
         )
     }
 
@@ -148,17 +148,5 @@ impl Sample {
             header.number_of_elements(),
             header.payload_offset(),
         )
-    }
-}
-
-// Helpers of the Python-side methods that are no longer part of the Python API.
-impl Sample {
-    pub fn __slice_len(&self) -> usize {
-        match &*self.value.lock() {
-            SampleType::Ipc(Some(v)) => v.payload().len(),
-            SampleType::Local(Some(v)) => v.payload().len(),
-            _ => fatal_panic!(from "Sample::header()",
-                "Accessing a released sample."),
-        }
     }
 }

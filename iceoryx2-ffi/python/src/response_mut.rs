@@ -126,7 +126,7 @@ impl ResponseMut {
             slf.as_any(),
             &this.response_payload_type_details,
             this.payload_ptr(),
-            Some(this.__slice_len()),
+            Some(this.header().number_of_elements()),
         )
     }
 
@@ -168,17 +168,5 @@ impl ResponseMut {
             header.number_of_elements(),
             header.payload_offset(),
         )
-    }
-}
-
-// Helpers of the Python-side methods that are no longer part of the Python API.
-impl ResponseMut {
-    pub fn __slice_len(&self) -> usize {
-        match &*self.value.lock() {
-            ResponseMutType::Ipc(Some(v)) => v.payload().len(),
-            ResponseMutType::Local(Some(v)) => v.payload().len(),
-            _ => fatal_panic!(from "RequestMut::__slice_len()",
-                "Accessing a released response mut."),
-        }
     }
 }

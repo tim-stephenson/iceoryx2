@@ -214,7 +214,7 @@ impl ActiveRequest {
             slf.as_any(),
             &this.request_payload_type_details,
             this.payload_ptr(),
-            Some(this.__slice_len()),
+            Some(this.header().number_of_elements()),
         )
     }
 
@@ -290,15 +290,6 @@ impl ActiveRequest {
             }),
             _ => fatal_panic!(from "ActiveRequest::loan_slice_uninit()",
                     "Accessing a released active request"),
-        }
-    }
-
-    pub fn __slice_len(&self) -> usize {
-        match &*self.value.lock() {
-            ActiveRequestType::Ipc(Some(v)) => v.payload().len(),
-            ActiveRequestType::Local(Some(v)) => v.payload().len(),
-            _ => fatal_panic!(from "RequestMutUninit::__slice_len()",
-                "Accessing a released request."),
         }
     }
 }

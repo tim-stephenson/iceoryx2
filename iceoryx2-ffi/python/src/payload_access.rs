@@ -137,14 +137,14 @@ fn payload_kind<'py>(
         .transpose()
 }
 
-/// The payload of `owner`: a `Slice` when the payload type is a `Slice`, otherwise a
-/// `ctypes.POINTER` to the payload type. `slice_len` is `None` when `owner` does not provide
-/// the number of elements of a `Slice` payload.
+/// The payload of `owner`: a `Slice` of its `number_of_elements` elements when the payload type
+/// is a `Slice`, otherwise a `ctypes.POINTER` to the payload type. `number_of_elements` is
+/// `None` when `owner` does not provide the number of elements of a `Slice` payload.
 pub(crate) fn payload<'py>(
     owner: &Bound<'py, PyAny>,
     payload_type: &TypeStorage,
     payload_ptr: usize,
-    slice_len: Option<usize>,
+    number_of_elements: Option<u64>,
 ) -> PyResult<Py<PyAny>> {
     let py = owner.py();
     ensure(
@@ -152,13 +152,14 @@ pub(crate) fn payload<'py>(
         "the payload type is not defined",
     )?;
     if let Some((PayloadKind::Slice, element_type)) = payload_kind(py, payload_type)? {
-        let Some(slice_len) = slice_len else {
+        let Some(number_of_elements) = number_of_elements else {
             return Err(PyAttributeError::new_err(format!(
                 "'{}' does not provide the length of a `Slice` payload",
                 owner.get_type().name()?
             )));
         };
-        return Ok(slice(owner, payload_ptr, slice_len, &element_type)?.unbind());
+        let number_of_elements = number_of_elements as usize;
+        return Ok(slice(owner, payload_ptr, number_of_elements, &element_type)?.unbind());
     }
     Ok(pointer(py, payload_ptr, payload_type.value.as_ref(), Some(owner))?.unbind())
 }

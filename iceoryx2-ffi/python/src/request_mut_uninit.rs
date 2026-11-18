@@ -138,7 +138,7 @@ impl RequestMutUninit {
             slf.as_any(),
             &this.request_payload_type_details,
             this.payload_ptr(),
-            Some(this.__slice_len()),
+            Some(this.header().number_of_elements()),
         )
     }
 
@@ -186,15 +186,6 @@ impl RequestMutUninit {
 
 // Helpers of the Python-side methods that are no longer part of the Python API.
 impl RequestMutUninit {
-    pub fn __slice_len(&self) -> usize {
-        match &*self.value.lock() {
-            RequestMutUninitType::Ipc(Some(v)) => v.payload().len(),
-            RequestMutUninitType::Local(Some(v)) => v.payload().len(),
-            _ => fatal_panic!(from "RequestMutUninit::__slice_len()",
-                "Accessing a released request."),
-        }
-    }
-
     pub fn __available_payload_memory(&self) -> usize {
         match &*self.value.lock() {
             RequestMutUninitType::Ipc(Some(v)) => v.__internal_available_payload_memory(),

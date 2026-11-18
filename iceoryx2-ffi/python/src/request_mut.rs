@@ -152,7 +152,7 @@ impl RequestMut {
             slf.as_any(),
             &this.request_payload_type_details,
             this.payload_ptr(),
-            Some(this.__slice_len()),
+            Some(this.header().number_of_elements()),
         )
     }
 
@@ -194,17 +194,5 @@ impl RequestMut {
             header.number_of_elements(),
             header.payload_offset(),
         )
-    }
-}
-
-// Helpers of the Python-side methods that are no longer part of the Python API.
-impl RequestMut {
-    pub fn __slice_len(&self) -> usize {
-        match &*self.value.lock() {
-            RequestMutType::Ipc(Some(v)) => v.payload().len(),
-            RequestMutType::Local(Some(v)) => v.payload().len(),
-            _ => fatal_panic!(from "RequestMutUninit::__slice_len()",
-                "Accessing a released request."),
-        }
     }
 }

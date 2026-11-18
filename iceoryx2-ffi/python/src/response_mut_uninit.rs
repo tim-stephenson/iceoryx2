@@ -138,7 +138,7 @@ impl ResponseMutUninit {
             slf.as_any(),
             &this.response_payload_type_details,
             this.payload_ptr(),
-            Some(this.__slice_len()),
+            Some(this.header().number_of_elements()),
         )
     }
 
@@ -186,15 +186,6 @@ impl ResponseMutUninit {
 
 // Helpers of the Python-side methods that are no longer part of the Python API.
 impl ResponseMutUninit {
-    pub fn __slice_len(&self) -> usize {
-        match &*self.value.lock() {
-            ResponseMutUninitType::Ipc(Some(v)) => v.payload().len(),
-            ResponseMutUninitType::Local(Some(v)) => v.payload().len(),
-            _ => fatal_panic!(from "ResponseMutUninit::__slice_len()",
-                "Accessing a released response."),
-        }
-    }
-
     pub fn __available_payload_memory(&self) -> usize {
         match &*self.value.lock() {
             ResponseMutUninitType::Ipc(Some(v)) => v.__internal_available_payload_memory(),

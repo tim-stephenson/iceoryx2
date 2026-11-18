@@ -157,7 +157,7 @@ impl SampleMut {
             slf.as_any(),
             &this.payload_type_details,
             this.payload_ptr(),
-            Some(this.__slice_len()),
+            Some(this.header().number_of_elements()),
         )
     }
 
@@ -209,15 +209,6 @@ impl SampleMut {
             SampleMutType::Ipc(Some(v)) => v.truncate(number_of_elements),
             SampleMutType::Local(Some(v)) => v.truncate(number_of_elements),
             _ => fatal_panic!(from "SampleMut::__truncate()",
-                "Accessing a released sample."),
-        }
-    }
-
-    pub fn __slice_len(&self) -> usize {
-        match &*self.value.lock() {
-            SampleMutType::Ipc(Some(v)) => v.payload().len(),
-            SampleMutType::Local(Some(v)) => v.payload().len(),
-            _ => fatal_panic!(from "Sample::header()",
                 "Accessing a released sample."),
         }
     }
