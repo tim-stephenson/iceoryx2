@@ -185,4 +185,27 @@
     let bp_action = BackpressureAction::FollowBackpressureStrategy;
     ```
 
+4. The Python bindings implement all methods of their classes in Rust, which
+   changes the following behaviour:
+
+   * The length of a `Slice` payload is its number of elements instead of its
+     number of bytes, so a `Slice` of a multi-byte type no longer accepts
+     indices past its end
+
+    ```python
+    sample = publisher.loan_slice_uninit(3) # Slice[ctypes.c_uint64]
+
+    # old
+    sample.payload().len() # 24
+
+    # new
+    sample.payload().len() # 3
+    ```
+
+   * The checks of the payload kind and of the size and alignment of a copied
+     value raise an `AssertionError` also when Python runs with `-O`
+   * The modules `iceoryx2.publish_subscribe_extensions` and
+     `iceoryx2.request_response_extensions` are removed, their methods are part
+     of the classes in `iceoryx2`
+
 <!-- markdownlint-enable MD013 -->
