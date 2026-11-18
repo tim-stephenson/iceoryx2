@@ -61,6 +61,7 @@
 * [#1977](https://github.com/eclipse-iceoryx/iceoryx2/issues/1977) Remove the former gateway core in `iceoryx2-gateway/`, superseded by the link crates
 * [#1977](https://github.com/eclipse-iceoryx/iceoryx2/issues/1977) Tidy up implementation of the link's discovery state
 * [#2010](https://github.com/eclipse-iceoryx/iceoryx2/issues/2010) Receive bytes from a tunnel directly into loaned samples
+* [#2183](https://github.com/eclipse-iceoryx/iceoryx2/issues/2183) Implement the Python binding methods that register types, check the payload kind or copy values in Rust
 
 ### Workflow
 

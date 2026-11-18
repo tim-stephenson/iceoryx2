@@ -10,6 +10,7 @@
 //
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
+use crate::python_types::{self, PayloadKind, ensure};
 use iceoryx2::service::marker::{CustomHeaderMarker, CustomPayloadMarker};
 use iceoryx2_bb_container::string::StaticString;
 use iceoryx2_bb_flatbuffers::TypeName;
@@ -81,53 +82,6 @@ impl ServiceBuilderPublishSubscribe {
 
 #[pymethods]
 impl ServiceBuilderPublishSubscribe {
-    pub fn __set_payload_type(&mut self, value: Py<PyAny>) {
-        self.payload_type_details.value = Some(value)
-    }
-
-    pub fn __set_user_header_type(&mut self, value: Py<PyAny>) {
-        self.user_header_type_details.value = Some(value)
-    }
-
-    #[getter]
-    pub fn __get_payload_type_details(&self) -> Option<Py<PyAny>> {
-        self.payload_type_details.clone().value
-    }
-
-    /// Defines the payload type. To be able to connect to a `Service` the `TypeDetail` must be
-    /// identical in all participants since the communication is always strongly typed.
-    pub fn __payload_type_details(&self, value: &TypeDetail) -> Self {
-        match &self.value {
-            ServiceBuilderPublishSubscribeType::Ipc(v) => {
-                let this = v.clone();
-                let this = unsafe { this.__internal_set_payload_type_details(&value.0) };
-                self.clone_ipc(this)
-            }
-            ServiceBuilderPublishSubscribeType::Local(v) => {
-                let this = v.clone();
-                let this = unsafe { this.__internal_set_payload_type_details(&value.0) };
-                self.clone_local(this)
-            }
-        }
-    }
-
-    /// Defines the user header type. To be able to connect to a `Service` the `TypeDetail` must be
-    /// identical in all participants since the communication is always strongly typed.
-    pub fn __user_header_type_details(&self, value: &TypeDetail) -> Self {
-        match &self.value {
-            ServiceBuilderPublishSubscribeType::Ipc(v) => {
-                let this = v.clone();
-                let this = unsafe { this.__internal_set_user_header_type_details(&value.0) };
-                self.clone_ipc(this)
-            }
-            ServiceBuilderPublishSubscribeType::Local(v) => {
-                let this = v.clone();
-                let this = unsafe { this.__internal_set_user_header_type_details(&value.0) };
-                self.clone_local(this)
-            }
-        }
-    }
-
     /// Overrides and increases the alignment of the payload - useful when the payload is used in
     /// SIMD operations. To be able to connect to a `Service` the payload alignment must be
     /// identical in all participants since the communication is always strongly typed.
@@ -264,42 +218,6 @@ impl ServiceBuilderPublishSubscribe {
             ServiceBuilderPublishSubscribeType::Local(v) => {
                 let this = v.clone();
                 let this = this.max_nodes(value);
-                self.clone_local(this)
-            }
-        }
-    }
-
-    pub fn __type_definition_name_hint(&self, name: &str, namespace: &str) -> Self {
-        let type_name = TypeName {
-            name: StaticString::from_str_truncated(name)
-                .expect("Typenames contain only valid UTF-8 characters."),
-            namespace: StaticString::from_str_truncated(namespace)
-                .expect("Namespace names contain only valid UTF-8 characters."),
-        };
-        match &self.value {
-            ServiceBuilderPublishSubscribeType::Ipc(v) => {
-                let this = v.clone();
-                let this = this.__internal_type_definition_name_hint(&type_name);
-                self.clone_ipc(this)
-            }
-            ServiceBuilderPublishSubscribeType::Local(v) => {
-                let this = v.clone();
-                let this = this.__internal_type_definition_name_hint(&type_name);
-                self.clone_local(this)
-            }
-        }
-    }
-
-    pub fn __flatbuffer_schema_path(&self, path: &FilePath) -> Self {
-        match &self.value {
-            ServiceBuilderPublishSubscribeType::Ipc(v) => {
-                let this = v.clone();
-                let this = unsafe { this.__internal_flatbuffer_schema_path(&path.0) };
-                self.clone_ipc(this)
-            }
-            ServiceBuilderPublishSubscribeType::Local(v) => {
-                let this = v.clone();
-                let this = unsafe { this.__internal_flatbuffer_schema_path(&path.0) };
                 self.clone_local(this)
             }
         }
@@ -492,5 +410,111 @@ impl ServiceBuilderPublishSubscribe {
                 ))
             }
         }
+    }
+
+    /// Sets the user header type for the service.
+    pub fn user_header(&self, t: &Bound<'_, PyAny>) -> PyResult<Self> {
+        let mut this = self.set_user_header_type_details(&python_types::fixed_size_type_detail(t)?);
+        this.user_header_type_details =
+            TypeStorage::with_kind(t.clone().unbind(), PayloadKind::FixedSize);
+        Ok(this)
+    }
+
+    /// Sets the path to the flatbuffer schema file.
+    ///
+    /// If this is not explicitly defined, iceoryx2 will try to find the best fitting schema file
+    /// in the configured flatbuffer schema paths defined in the config.
+    pub fn flatbuffer_schema_path(&self, value: &FilePath) -> PyResult<Self> {
+        ensure(
+            self.payload_type_details.kind == PayloadKind::Flatbuffer,
+            "a flatbuffer schema path requires a `Flatbuffer` payload",
+        )?;
+        Ok(self.flatbuffer_schema_path_unchecked(value))
+    }
+}
+
+// Helpers of the Python-side methods that are no longer part of the Python API.
+impl ServiceBuilderPublishSubscribe {
+    /// Defines the payload type. To be able to connect to a `Service` the `TypeDetail` must be
+    /// identical in all participants since the communication is always strongly typed.
+    pub(crate) fn set_payload_type_details(&self, value: &TypeDetail) -> Self {
+        match &self.value {
+            ServiceBuilderPublishSubscribeType::Ipc(v) => {
+                let this = v.clone();
+                let this = unsafe { this.__internal_set_payload_type_details(&value.0) };
+                self.clone_ipc(this)
+            }
+            ServiceBuilderPublishSubscribeType::Local(v) => {
+                let this = v.clone();
+                let this = unsafe { this.__internal_set_payload_type_details(&value.0) };
+                self.clone_local(this)
+            }
+        }
+    }
+
+    /// Defines the user header type. To be able to connect to a `Service` the `TypeDetail` must be
+    /// identical in all participants since the communication is always strongly typed.
+    pub(crate) fn set_user_header_type_details(&self, value: &TypeDetail) -> Self {
+        match &self.value {
+            ServiceBuilderPublishSubscribeType::Ipc(v) => {
+                let this = v.clone();
+                let this = unsafe { this.__internal_set_user_header_type_details(&value.0) };
+                self.clone_ipc(this)
+            }
+            ServiceBuilderPublishSubscribeType::Local(v) => {
+                let this = v.clone();
+                let this = unsafe { this.__internal_set_user_header_type_details(&value.0) };
+                self.clone_local(this)
+            }
+        }
+    }
+
+    pub(crate) fn type_definition_name_hint(&self, name: &str, namespace: &str) -> Self {
+        let type_name = TypeName {
+            name: StaticString::from_str_truncated(name)
+                .expect("Typenames contain only valid UTF-8 characters."),
+            namespace: StaticString::from_str_truncated(namespace)
+                .expect("Namespace names contain only valid UTF-8 characters."),
+        };
+        match &self.value {
+            ServiceBuilderPublishSubscribeType::Ipc(v) => {
+                let this = v.clone();
+                let this = this.__internal_type_definition_name_hint(&type_name);
+                self.clone_ipc(this)
+            }
+            ServiceBuilderPublishSubscribeType::Local(v) => {
+                let this = v.clone();
+                let this = this.__internal_type_definition_name_hint(&type_name);
+                self.clone_local(this)
+            }
+        }
+    }
+
+    pub(crate) fn flatbuffer_schema_path_unchecked(&self, path: &FilePath) -> Self {
+        match &self.value {
+            ServiceBuilderPublishSubscribeType::Ipc(v) => {
+                let this = v.clone();
+                let this = unsafe { this.__internal_flatbuffer_schema_path(&path.0) };
+                self.clone_ipc(this)
+            }
+            ServiceBuilderPublishSubscribeType::Local(v) => {
+                let this = v.clone();
+                let this = unsafe { this.__internal_flatbuffer_schema_path(&path.0) };
+                self.clone_local(this)
+            }
+        }
+    }
+
+    /// Defines the payload type, a ctypes type, `Slice[T]` or `Flatbuffer[T]`, and no user header.
+    pub(crate) fn with_payload_type(&self, t: &Bound<'_, PyAny>) -> PyResult<Self> {
+        let payload = python_types::payload_type_detail(t)?;
+        let mut this = self
+            .set_payload_type_details(&payload.type_detail)
+            .set_user_header_type_details(&python_types::unit_type_detail()?);
+        if let Some(name) = &payload.flatbuffer_type_name {
+            this = this.type_definition_name_hint(name, "");
+        }
+        this.payload_type_details = TypeStorage::with_kind(t.clone().unbind(), payload.kind);
+        Ok(this)
     }
 }

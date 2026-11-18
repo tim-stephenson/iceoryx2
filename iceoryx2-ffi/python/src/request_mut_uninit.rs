@@ -10,6 +10,7 @@
 //
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
+use crate::python_types::{self, PayloadKind, ensure};
 use core::mem::MaybeUninit;
 
 use iceoryx2::service::marker::{CustomHeaderMarker, CustomPayloadMarker};
@@ -244,5 +245,19 @@ impl RequestMutUninit {
                 v.take();
             }
         }
+    }
+
+    /// Writes the provided value into the request and returns the initialized `RequestMut`.
+    pub fn write_payload(&self, t: &Bound<'_, PyAny>) -> PyResult<RequestMut> {
+        ensure(
+            self.request_payload_type_details.kind != PayloadKind::Flatbuffer,
+            "`write_payload()` is not available for `Flatbuffer` payloads",
+        )?;
+        python_types::copy_value(
+            t,
+            self.request_payload_type_details.value.as_ref(),
+            self.payload_ptr(),
+        )?;
+        Ok(self.__assume_init())
     }
 }

@@ -12,9 +12,13 @@
 
 use pyo3::prelude::*;
 
+use crate::python_types::PayloadKind;
+
 #[pyclass(from_py_object)]
 pub struct TypeStorage {
     pub value: Option<Py<PyAny>>,
+    /// How a payload of this type is transmitted. Only meaningful for payload types.
+    pub kind: PayloadKind,
 }
 
 impl Default for TypeStorage {
@@ -30,12 +34,23 @@ impl Clone for TypeStorage {
                 .value
                 .as_ref()
                 .map(|v| Python::attach(|py| v.clone_ref(py))),
+            kind: self.kind,
         }
     }
 }
 
 impl TypeStorage {
     pub fn new() -> Self {
-        Self { value: None }
+        Self {
+            value: None,
+            kind: PayloadKind::FixedSize,
+        }
+    }
+
+    pub fn with_kind(value: Py<PyAny>, kind: PayloadKind) -> Self {
+        Self {
+            value: Some(value),
+            kind,
+        }
     }
 }

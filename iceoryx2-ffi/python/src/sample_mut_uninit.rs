@@ -10,6 +10,7 @@
 //
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
+use crate::python_types::{self, PayloadKind, ensure};
 use core::mem::MaybeUninit;
 
 use iceoryx2::service::marker::{CustomHeaderMarker, CustomPayloadMarker};
@@ -78,15 +79,6 @@ impl SampleMutUninit {
             SampleMutUninitType::Ipc(Some(v)) => v.payload().len(),
             SampleMutUninitType::Local(Some(v)) => v.payload().len(),
             _ => fatal_panic!(from "Sample::__slice_len()",
-                "Accessing a released sample."),
-        }
-    }
-
-    pub fn __truncate(&self, number_of_elements: usize) {
-        match &mut *self.value.lock() {
-            SampleMutUninitType::Ipc(Some(v)) => v.truncate(number_of_elements),
-            SampleMutUninitType::Local(Some(v)) => v.truncate(number_of_elements),
-            _ => fatal_panic!(from "SampleMutUninit::__truncate()",
                 "Accessing a released sample."),
         }
     }
@@ -234,6 +226,46 @@ impl SampleMutUninit {
             SampleMutUninitType::Local(v) => {
                 v.take();
             }
+        }
+    }
+
+    /// Shortens the payload to its first `number_of_elements` elements, so that only those are
+    /// sent.
+    ///
+    /// It has no effect when `number_of_elements` is not smaller than the current number of
+    /// elements. Fails when it is called for data types which are not a slice.
+    pub fn truncate(&self, number_of_elements: usize) -> PyResult<()> {
+        ensure(
+            self.payload_type_details.kind == PayloadKind::Slice,
+            "`truncate()` requires a `Slice` payload",
+        )?;
+        self.truncate_unchecked(number_of_elements);
+        Ok(())
+    }
+
+    /// Writes the provided value into the sample and returns the initialized `SampleMut`.
+    pub fn write_payload(&self, t: &Bound<'_, PyAny>) -> PyResult<SampleMut> {
+        ensure(
+            self.payload_type_details.kind != PayloadKind::Flatbuffer,
+            "`write_payload()` is not available for `Flatbuffer` payloads",
+        )?;
+        python_types::copy_value(
+            t,
+            self.payload_type_details.value.as_ref(),
+            self.payload_ptr(),
+        )?;
+        Ok(self.__assume_init())
+    }
+}
+
+// Helpers of the Python-side methods that are no longer part of the Python API.
+impl SampleMutUninit {
+    pub(crate) fn truncate_unchecked(&self, number_of_elements: usize) {
+        match &mut *self.value.lock() {
+            SampleMutUninitType::Ipc(Some(v)) => v.truncate(number_of_elements),
+            SampleMutUninitType::Local(Some(v)) => v.truncate(number_of_elements),
+            _ => fatal_panic!(from "SampleMutUninit::__truncate()",
+                "Accessing a released sample."),
         }
     }
 }
