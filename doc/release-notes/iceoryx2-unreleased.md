@@ -62,6 +62,7 @@
 * [#1977](https://github.com/eclipse-iceoryx/iceoryx2/issues/1977) Tidy up implementation of the link's discovery state
 * [#2010](https://github.com/eclipse-iceoryx/iceoryx2/issues/2010) Receive bytes from a tunnel directly into loaned samples
 * [#2183](https://github.com/eclipse-iceoryx/iceoryx2/issues/2183) Implement the Python binding methods that register types, check the payload kind or copy values in Rust
+* [#2183](https://github.com/eclipse-iceoryx/iceoryx2/issues/2183) Show the type annotations of the methods implemented in Rust in the Python API documentation
 
 ### Workflow
 

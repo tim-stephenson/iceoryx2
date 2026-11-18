@@ -27,7 +27,11 @@ poethepoet = { version = "~0.35.0", extras = ["poetry_plugin"]}
 poetry_command = ""
 
 [tool.poe.tasks.build-bindings]
-shell = "maturin develop --manifest-path ../../../iceoryx2-ffi/python/Cargo.toml --target-dir ../../../target/ff/python"
+sequence = [
+    { shell = "maturin develop --manifest-path ../../../iceoryx2-ffi/python/Cargo.toml --target-dir ../../../target/ff/python" },
+    # the docs take the signatures of the Rust methods from the type stubs
+    { shell = "maturin generate-stubs --manifest-path ../../../iceoryx2-ffi/python/Cargo.toml --features log,pyo3/extension-module,pyo3/experimental-inspect --target-dir ../../../target/ff/python --out ../../../iceoryx2-ffi/python/python-src" },
+]
 
 [tool.poe.tasks.build-docs]
 shell = "sphinx-build -M html . target --keep-going"

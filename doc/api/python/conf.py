@@ -10,6 +10,13 @@
 #
 # SPDX-License-Identifier: Apache-2.0 OR MIT
 
+import ast
+import inspect
+from pathlib import Path
+
+import iceoryx2
+import sphinx.util.logging
+
 # -- Project information -----------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
@@ -211,5 +218,68 @@ def resolve_in_package(app, env, node, contnode):
     )
 
 
+# -- Signatures of the Rust methods ------------------------------------------
+
+# The methods implemented in Rust only provide `__text_signature__`, which has no
+# type annotations. The type stubs that PyO3 generates for the `_iceoryx2`
+# extension module have them, so the signatures are taken from there.
+
+logger = sphinx.util.logging.getLogger(__name__)
+
+
+def stub_signatures(stub_directory):
+    """Maps the qualified name of each function in the stubs to its signature."""
+    signatures = {}
+
+    def collect(prefix, body):
+        for node in body:
+            if isinstance(node, ast.ClassDef):
+                collect(f'{prefix}.{node.name}', node.body)
+            elif isinstance(node, ast.FunctionDef):
+                signatures[f'{prefix}.{node.name}'] = signature_of(node)
+
+    for stub in sorted(stub_directory.glob('*.pyi')):
+        module = 'iceoryx2' if stub.stem == '__init__' else f'iceoryx2.{stub.stem}'
+        collect(module, ast.parse(stub.read_text()).body)
+    return signatures
+
+
+def signature_of(function):
+    """The signature of a stub function without `self` or `cls`, as autodoc expects it."""
+    args = function.args
+    is_static = any(
+        isinstance(d, ast.Name) and d.id == 'staticmethod' for d in function.decorator_list
+    )
+    if not is_static:
+        if args.posonlyargs:
+            args.posonlyargs.pop(0)
+        elif args.args:
+            args.args.pop(0)
+    returns = ast.unparse(function.returns) if function.returns else None
+    return f'({ast.unparse(args)})', returns
+
+
+def rust_signatures():
+    stub_directory = Path(iceoryx2._iceoryx2.__file__).parent / '_iceoryx2'
+    if not (stub_directory / '__init__.pyi').is_file():
+        logger.warning(
+            'no type stubs in %s, the signatures of the Rust methods are shown without types; '
+            'run the build-bindings task to generate them', stub_directory
+        )
+        return {}
+    return stub_signatures(stub_directory)
+
+
+RUST_SIGNATURES = rust_signatures()
+
+
+def signature_from_stubs(app, what, name, obj, options, signature, return_annotation):
+    """Replaces the signature of a function implemented in Rust with the one of its stub."""
+    if not (inspect.isbuiltin(obj) or inspect.ismethoddescriptor(obj)):
+        return None
+    return RUST_SIGNATURES.get(name)
+
+
 def setup(app):
     app.connect('missing-reference', resolve_in_package)
+    app.connect('autodoc-process-signature', signature_from_stubs)
