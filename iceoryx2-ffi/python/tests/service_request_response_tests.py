@@ -629,3 +629,167 @@ def test_port_names_can_be_set(
 
     assert client.name == client_name
     assert server.name == server_name
+
+
+@pytest.mark.parametrize("service_type", service_types)
+def test_non_slice_type_forbids_use_of_slice_port_factory_api(
+    service_type: iox2.ServiceType,
+) -> None:
+    config = iox2.testing.generate_isolated_config()
+    node = iox2.NodeBuilder.new().config(config).create(service_type)
+
+    service_name = iox2.testing.generate_service_name()
+    service = (
+        node.service_builder(service_name).request_response(Payload, Payload).create()
+    )
+
+    with pytest.raises(AssertionError, match="Slice"):
+        service.client_builder().initial_max_slice_len(8)
+
+    with pytest.raises(AssertionError, match="Slice"):
+        service.client_builder().allocation_strategy(iox2.AllocationStrategy.PowerOfTwo)
+
+    with pytest.raises(AssertionError, match="Slice"):
+        service.server_builder().initial_max_slice_len(8)
+
+    with pytest.raises(AssertionError, match="Slice"):
+        service.server_builder().allocation_strategy(iox2.AllocationStrategy.PowerOfTwo)
+
+
+@pytest.mark.parametrize("service_type", service_types)
+def test_port_factory_slice_api_checks_the_payload_of_its_own_side(
+    service_type: iox2.ServiceType,
+) -> None:
+    config = iox2.testing.generate_isolated_config()
+    node = iox2.NodeBuilder.new().config(config).create(service_type)
+
+    service_name = iox2.testing.generate_service_name()
+    service = (
+        node.service_builder(service_name)
+        .request_response(iox2.Slice[ctypes.c_uint8], Payload)
+        .create()
+    )
+
+    service.client_builder().initial_max_slice_len(8).allocation_strategy(
+        iox2.AllocationStrategy.PowerOfTwo
+    ).create()
+
+    with pytest.raises(AssertionError, match="Slice"):
+        service.server_builder().initial_max_slice_len(8)
+
+
+@pytest.mark.parametrize("service_type", service_types)
+@pytest.mark.parametrize("payload_type", [Payload, iox2.Slice[ctypes.c_uint8]])
+def test_non_flatbuffer_type_forbids_use_of_flatbuffer_api(
+    service_type: iox2.ServiceType,
+    payload_type: type,
+) -> None:
+    config = iox2.testing.generate_isolated_config()
+    node = iox2.NodeBuilder.new().config(config).create(service_type)
+
+    service_name = iox2.testing.generate_service_name()
+    service_builder = node.service_builder(service_name).request_response(
+        payload_type, payload_type
+    )
+    schema_path = iox2.FilePath.new("schema.bfbs")
+
+    with pytest.raises(AssertionError, match="Flatbuffer"):
+        service_builder.request_flatbuffer_schema_path(schema_path)
+
+    with pytest.raises(AssertionError, match="Flatbuffer"):
+        service_builder.response_flatbuffer_schema_path(schema_path)
+
+    service = service_builder.create()
+
+    with pytest.raises(AssertionError, match="Flatbuffer"):
+        service.client_builder().initial_reserved_memory(1024)
+
+    with pytest.raises(AssertionError, match="Flatbuffer"):
+        service.server_builder().initial_reserved_memory(1024)
+
+    server = service.server_builder().create()
+    client = service.client_builder().create()
+
+    with pytest.raises(AssertionError, match="Flatbuffer"):
+        client.loan_flatbuffer()
+
+    if payload_type is Payload:
+        client.send_copy(Payload(data=1))
+    else:
+        client.loan_slice_uninit(1).assume_init().send()
+
+    active_request = server.receive()
+    assert active_request is not None
+
+    with pytest.raises(AssertionError, match="Flatbuffer"):
+        active_request.loan_flatbuffer()
+
+
+LAYOUT_MISMATCHES = [
+    (Payload(data=1), "size"),
+    ((ctypes.c_uint8 * ctypes.sizeof(LargePayload))(), "alignment"),
+]
+
+
+@pytest.mark.parametrize("service_type", service_types)
+@pytest.mark.parametrize("value, reason", LAYOUT_MISMATCHES)
+def test_request_fails_when_value_layout_does_not_match_request_type(
+    service_type: iox2.ServiceType,
+    value: ctypes.Structure,
+    reason: str,
+) -> None:
+    config = iox2.testing.generate_isolated_config()
+    node = iox2.NodeBuilder.new().config(config).create(service_type)
+
+    service_name = iox2.testing.generate_service_name()
+    service = (
+        node.service_builder(service_name)
+        .request_response(LargePayload, LargePayload)
+        .create()
+    )
+    server = service.server_builder().create()
+    client = service.client_builder().create()
+
+    with pytest.raises(AssertionError, match=reason):
+        client.send_copy(value)
+
+    request_uninit = client.loan_uninit()
+
+    with pytest.raises(AssertionError, match=reason):
+        request_uninit.write_payload(value)
+
+    assert server.receive() is None
+
+
+@pytest.mark.parametrize("service_type", service_types)
+@pytest.mark.parametrize("value, reason", LAYOUT_MISMATCHES)
+def test_response_fails_when_value_layout_does_not_match_response_type(
+    service_type: iox2.ServiceType,
+    value: ctypes.Structure,
+    reason: str,
+) -> None:
+    config = iox2.testing.generate_isolated_config()
+    node = iox2.NodeBuilder.new().config(config).create(service_type)
+
+    service_name = iox2.testing.generate_service_name()
+    service = (
+        node.service_builder(service_name)
+        .request_response(LargePayload, LargePayload)
+        .create()
+    )
+    server = service.server_builder().create()
+    client = service.client_builder().create()
+
+    pending_response = client.send_copy(LargePayload(data=1))
+    active_request = server.receive()
+    assert active_request is not None
+
+    with pytest.raises(AssertionError, match=reason):
+        active_request.send_copy(value)
+
+    response_uninit = active_request.loan_uninit()
+
+    with pytest.raises(AssertionError, match=reason):
+        response_uninit.write_payload(value)
+
+    assert pending_response.receive() is None

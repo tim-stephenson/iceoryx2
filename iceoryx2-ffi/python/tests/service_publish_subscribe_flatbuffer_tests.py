@@ -487,3 +487,42 @@ def test_builder_is_cleaned_up_when_sample_is_initialized(
         unbounded_data = create_unbounded_data(builder, 91912)
         sample = sample.assume_init(unbounded_data)
         assert len(builder.Bytes) <= 256
+
+
+@pytest.mark.parametrize("service_type", service_types)
+def test_flatbuffer_type_forbids_use_of_non_flatbuffer_api(
+    service_type: iox2.ServiceType,
+) -> None:
+    config = iox2.testing.generate_isolated_config()
+    node = iox2.NodeBuilder.new().config(config).create(service_type)
+    service_name = iox2.testing.generate_service_name()
+    schema_file_path = get_schema_file(schema_unbounded)
+
+    sut = (
+        node.service_builder(service_name)
+        .publish_subscribe(iox2.Flatbuffer[UnboundedData])
+        .flatbuffer_schema_path(schema_file_path)
+        .create()
+    )
+
+    with pytest.raises(AssertionError, match="Slice"):
+        sut.publisher_builder().initial_max_slice_len(8)
+
+    publisher = sut.publisher_builder().create()
+
+    with pytest.raises(AssertionError, match="Flatbuffer"):
+        publisher.loan_uninit()
+
+    with pytest.raises(AssertionError, match="Slice"):
+        publisher.loan_slice_uninit(1)
+
+    with pytest.raises(AssertionError, match="Flatbuffer"):
+        publisher.send_copy(ctypes.c_uint8(0))
+
+    sample = publisher.loan_flatbuffer()
+
+    with pytest.raises(AssertionError, match="Flatbuffer"):
+        sample.write_payload(ctypes.c_uint8(0))
+
+    with pytest.raises(AssertionError, match="Slice"):
+        sample.truncate(0)
